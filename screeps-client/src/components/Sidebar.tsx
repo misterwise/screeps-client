@@ -1,3 +1,5 @@
+import { SelectionList } from '~/components/SelectionList.js'
+
 export function Sidebar(props: { isCollapsed?: boolean; onToggle?: () => void }) {
   const handleStripClick = () => {
     props.onToggle?.()
@@ -86,11 +88,7 @@ export function Sidebar(props: { isCollapsed?: boolean; onToggle?: () => void })
           )}
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
-          <div style={{ color: '#484f58', 'font-style': 'italic', 'font-size': '12px' }}>
-            Room properties, object details and menus will appear here…
-          </div>
-        </div>
+        <SelectionList />
       </div>
     </div>
   )

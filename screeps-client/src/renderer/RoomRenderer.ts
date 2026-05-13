@@ -1,4 +1,5 @@
 import { Application, Container, Graphics, Point, Rectangle } from 'pixi.js'
+import { HoverHighlightLayer } from './HoverHighlightLayer.js'
 
 export const TILE_SIZE = 12
 export const ROOM_SIZE = 50 * TILE_SIZE
@@ -8,6 +9,7 @@ const OVERSCROLL = 128
 export class RoomRenderer {
   readonly app: Application
   readonly world: Container
+  readonly hoverLayer: HoverHighlightLayer
   private destroyed = false
   private canDrag = false
   private container: HTMLElement
@@ -18,11 +20,16 @@ export class RoomRenderer {
   private lastMouseX = 0
   private lastMouseY = 0
 
+  private onHoverTile: ((tx: number | null, ty: number | null) => void) | null = null
+  private onClickTile: ((tx: number, ty: number) => void) | null = null
+
   private constructor(app: Application, container: HTMLElement) {
     this.app = app
     this.container = container
     this.world = new Container()
     this.app.stage.addChild(this.world)
+    this.hoverLayer = new HoverHighlightLayer(app.ticker)
+    this.world.addChild(this.hoverLayer.container)
     this.navOverlay = new Container()
     this.world.addChild(this.navOverlay)
     this.setupCamera()
@@ -33,6 +40,13 @@ export class RoomRenderer {
 
   bringNavOverlayToTop(): void {
     if (this.navOverlay.parent === this.world) {
+      this.world.removeChild(this.navOverlay)
+      this.world.addChild(this.navOverlay)
+    }
+    // Keep hover layer just below nav overlay
+    if (this.hoverLayer.container.parent === this.world) {
+      this.world.removeChild(this.hoverLayer.container)
+      this.world.addChild(this.hoverLayer.container)
       this.world.removeChild(this.navOverlay)
       this.world.addChild(this.navOverlay)
     }
@@ -191,22 +205,30 @@ export class RoomRenderer {
   private setupCamera(): void {
     let dragging = false
     let lastPos = new Point(0, 0)
+    let pointerDownPos = new Point(0, 0)
     const canvas = this.app.canvas
+    const CLICK_THRESHOLD = 4
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (!this.canDrag) return
       this.cancelBounce()
       this.cancelWheelTimeout()
       this.springBack()
-      dragging = true
+      dragging = this.canDrag
       lastPos = new Point(e.clientX, e.clientY)
-      canvas.setPointerCapture(e.pointerId)
+      pointerDownPos = new Point(e.clientX, e.clientY)
+      if (this.canDrag) canvas.setPointerCapture(e.pointerId)
     })
 
     canvas.addEventListener('pointermove', (e) => {
       const rect = canvas.getBoundingClientRect()
       this.lastMouseX = e.clientX - rect.left
       this.lastMouseY = e.clientY - rect.top
+
+      // Update hover highlight
+      const tile = this.screenToTile(this.lastMouseX, this.lastMouseY)
+      this.hoverLayer.setHoveredTile(tile?.tx ?? null, tile?.ty ?? null)
+      this.onHoverTile?.(tile?.tx ?? null, tile?.ty ?? null)
+
       if (!dragging || !this.canDrag) return
       const dx = e.clientX - lastPos.x
       const dy = e.clientY - lastPos.y
@@ -217,12 +239,31 @@ export class RoomRenderer {
     })
 
     const onUp = (e: PointerEvent) => {
+      if (this.canDrag) canvas.releasePointerCapture(e.pointerId)
+      const wasDragging = dragging
       dragging = false
-      canvas.releasePointerCapture(e.pointerId)
-      this.springBack()
+
+      // Treat as click if pointer barely moved
+      const dx = e.clientX - pointerDownPos.x
+      const dy = e.clientY - pointerDownPos.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < CLICK_THRESHOLD) {
+        const rect = canvas.getBoundingClientRect()
+        const sx = e.clientX - rect.left
+        const sy = e.clientY - rect.top
+        const tile = this.screenToTile(sx, sy)
+        if (tile) this.onClickTile?.(tile.tx, tile.ty)
+      }
+
+      if (wasDragging) this.springBack()
     }
     canvas.addEventListener('pointerup', onUp)
     canvas.addEventListener('pointercancel', onUp)
+
+    canvas.addEventListener('pointerleave', () => {
+      this.hoverLayer.setHoveredTile(null, null)
+      this.onHoverTile?.(null, null)
+    })
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault()
@@ -274,6 +315,28 @@ export class RoomRenderer {
         this.springBack()
       }, 80)
     }, { passive: false })
+  }
+
+  /** Register callbacks for hover and click tile events. */
+  setTileHandlers(
+    onHover: (tx: number | null, ty: number | null) => void,
+    onClick: (tx: number, ty: number) => void,
+  ): void {
+    this.onHoverTile = onHover
+    this.onClickTile = onClick
+  }
+
+  /**
+   * Convert screen (canvas-relative) coordinates to tile [0..49] coords.
+   * Returns null if outside the room bounds.
+   */
+  private screenToTile(screenX: number, screenY: number): { tx: number; ty: number } | null {
+    const worldX = (screenX - this.world.x) / this.world.scale.x
+    const worldY = (screenY - this.world.y) / this.world.scale.y
+    const tx = Math.floor(worldX / TILE_SIZE)
+    const ty = Math.floor(worldY / TILE_SIZE)
+    if (tx < 0 || tx >= 50 || ty < 0 || ty >= 50) return null
+    return { tx, ty }
   }
 
   private centerView(): void {
@@ -413,14 +476,16 @@ export class RoomRenderer {
   }
 
   clear(): void {
-    // Remove all children except navOverlay
+    // Remove all children except navOverlay and hoverLayer
     for (let i = this.world.children.length - 1; i >= 0; i--) {
       const child = this.world.children[i]
-      if (child !== this.navOverlay) {
+      if (child !== this.navOverlay && child !== this.hoverLayer.container) {
         this.world.removeChild(child)
       }
     }
     this.navOverlay.removeChildren()
+    this.hoverLayer.clearSelection()
+    this.hoverLayer.setHoveredTile(null, null)
     this.world.scale.set(1)
     this.cancelBounce()
     this.cancelWheelTimeout()
@@ -434,6 +499,7 @@ export class RoomRenderer {
     this.cancelWheelTimeout()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    this.hoverLayer.destroy()
     this.app.destroy(true, { children: true })
   }
 }

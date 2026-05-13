@@ -99,9 +99,16 @@ type ContainerWithTarget = Container & {
   __targetY?: number
 }
 
+export interface ObjectEntry {
+  id: string
+  obj: RoomObject
+  visual: ContainerWithTarget
+}
+
 export class ObjectLayer {
   readonly container: Container
   private objects = new Map<string, ContainerWithTarget>()
+  private rawObjects = new Map<string, RoomObject>()
   private ticker: Ticker | null = null
   private tickerCallback: (() => void) | null = null
 
@@ -136,6 +143,7 @@ export class ObjectLayer {
 
     for (const [id, obj] of Object.entries(objects)) {
       seen.add(id)
+      this.rawObjects.set(id, obj)
       const existing = this.objects.get(id)
       if (!existing) {
         const visual: ContainerWithTarget = createObjectVisual(obj)
@@ -161,8 +169,31 @@ export class ObjectLayer {
         this.container.removeChild(visual)
         visual.destroy()
         this.objects.delete(id)
+        this.rawObjects.delete(id)
       }
     }
+  }
+
+  /**
+   * Return all objects whose tile position matches (tx, ty).
+   * For creeps the tile is derived from their *target* (data) position, not
+   * the interpolated visual position, so selection is consistent.
+   */
+  getObjectsAtTile(tx: number, ty: number): ObjectEntry[] {
+    const result: ObjectEntry[] = []
+    for (const [id, visual] of this.objects) {
+      const obj = this.rawObjects.get(id)
+      if (!obj) continue
+      if (obj.x === tx && obj.y === ty) {
+        result.push({ id, obj, visual })
+      }
+    }
+    return result
+  }
+
+  /** Return the live PixiJS container for an object by id, if present. */
+  getVisualById(id: string): ContainerWithTarget | undefined {
+    return this.objects.get(id)
   }
 
   clear(): void {
@@ -170,6 +201,7 @@ export class ObjectLayer {
       visual.destroy()
     }
     this.objects.clear()
+    this.rawObjects.clear()
     this.container.removeChildren()
   }
 

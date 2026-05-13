@@ -3,6 +3,7 @@ import { RoomRenderer } from '~/renderer/RoomRenderer.js'
 import { createTerrainLayer } from '~/renderer/TerrainLayer.js'
 import { ObjectLayer } from '~/renderer/ObjectLayer.js'
 import { client } from '~/stores/clientStore.js'
+import { setSelection, clearSelection } from '~/stores/selectionStore.js'
 import { parseRoomName, formatRoomName } from '~/utils/roomName.js'
 import type { RoomTerrain, RoomObjectMap } from 'screeps-connectivity'
 import { SubscriptionGroup } from 'screeps-connectivity'
@@ -47,6 +48,7 @@ export function RoomViewer(props: RoomViewerProps) {
     setTerrain(null)
     setObjects(null)
     setGameTime(null)
+    clearSelection()
     r.clear()
     r.resetView()
     objLayer?.destroy()
@@ -109,6 +111,35 @@ export function RoomViewer(props: RoomViewerProps) {
       objLayer.container.label = 'objects'
       r.world.addChild(objLayer.container)
       r.bringNavOverlayToTop()
+
+      // Wire up tile click → selection
+      r.setTileHandlers(
+        // hover: nothing extra needed beyond what HoverHighlightLayer does internally
+        (_tx, _ty) => {},
+        (tx, ty) => {
+          if (!objLayer) return
+          const hits = objLayer.getObjectsAtTile(tx, ty)
+          if (hits.length === 0) return
+
+          // Build selection store entries
+          setSelection(hits.map(({ id, obj }) => ({
+            id,
+            type: obj.type,
+            name: typeof obj.name === 'string' ? obj.name : undefined,
+            x: obj.x,
+            y: obj.y,
+            raw: obj,
+          })))
+
+          // Build visual entries for the highlight layer
+          const visuals = hits.map(({ id, obj }) => ({
+            id,
+            type: obj.type,
+            visual: objLayer!.getVisualById(id)!,
+          })).filter(v => v.visual != null)
+          r.hoverLayer.setSelectedObjects(visuals)
+        },
+      )
     }
     objLayer.update(objs)
   })
