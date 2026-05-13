@@ -9,6 +9,7 @@ const [status, setStatus] = createSignal<ConnectionStatus>('idle')
 const [error, setError] = createSignal<string | null>(null)
 const [userInfo, setUserInfo] = createSignal<UserInfo | null>(null)
 const [serverVersion, setServerVersion] = createSignal<ServerVersion | null>(null)
+const [gameTime, setGameTime] = createSignal<number | null>(null)
 
 export const isPrivateServer = () => {
   const v = serverVersion()
@@ -16,7 +17,7 @@ export const isPrivateServer = () => {
   return (v.serverData?.shards?.length ?? 0) === 0
 }
 
-export { client, status, error, userInfo, serverVersion }
+export { client, status, error, userInfo, serverVersion, gameTime, setGameTime }
 
 export async function connect(opts: {
   url: string

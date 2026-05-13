@@ -1,5 +1,6 @@
 import { For, Show } from 'solid-js'
 import { selection, deselectItem } from '~/stores/selectionStore.js'
+import { gameTime } from '~/stores/clientStore.js'
 import type { SelectedObject } from '~/stores/selectionStore.js'
 
 // Mirror the palette from ObjectLayer so colors match
@@ -60,8 +61,8 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 /** Fields we want to surface as key-value rows (exclude noisy / structural ones) */
-const SKIP_FIELDS = new Set(['x', 'y', 'type', 'id', 'name', 'user', '_id', 'room'])
-const NUMERIC_FIELDS = new Set(['hits', 'hitsMax', 'energy', 'energyCapacity', 'store', 'progress', 'progressTotal'])
+const SKIP_FIELDS = new Set(['x', 'y', 'type', 'id', 'name', 'user', '_id', 'room', 'hitsMax'])
+const NUMERIC_FIELDS = new Set(['hits', 'energy', 'energyCapacity', 'store', 'progress', 'progressTotal', 'nextDecayTime'])
 
 function formatValue(value: unknown): string | null {
   if (typeof value === 'number') return String(value)
@@ -77,9 +78,23 @@ function DefaultDetails(props: { item: SelectedObject }) {
     const pairs: { key: string; value: string }[] = []
     for (const [k, v] of Object.entries(raw)) {
       if (SKIP_FIELDS.has(k)) continue
+      
+      let finalKey = k
+      let finalValue = formatValue(v)
+
+      if (k === 'hits' && typeof raw.hitsMax === 'number') {
+        finalValue = `${v} / ${raw.hitsMax}`
+      }
+
+      if (k === 'nextDecayTime' && typeof v === 'number') {
+        const gt = gameTime()
+        if (gt !== null) {
+          finalValue = String(v - gt)
+        }
+      }
+
       // Prioritise NUMERIC_FIELDS first, then show others
-      const fmt = formatValue(v)
-      if (fmt !== null) pairs.push({ key: k, value: fmt })
+      if (finalValue !== null) pairs.push({ key: finalKey, value: finalValue })
     }
     // Sort: NUMERIC_FIELDS first
     pairs.sort((a, b) => {
@@ -265,7 +280,7 @@ function SelectionItem(props: { item: SelectedObject }) {
 
 export function SelectionList() {
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
+    <div style={{ flex: 1, overflow: 'auto', 'min-height': 0, padding: '8px' }}>
       <Show
         when={selection().length > 0}
         fallback={
