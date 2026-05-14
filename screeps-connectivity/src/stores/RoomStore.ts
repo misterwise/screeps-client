@@ -56,6 +56,7 @@ export class RoomStore extends TypedStore<RoomStoreEvents> {
     return this.roomObjects.get(`${room}/${shard}`) ?? null
   }
 
+  /** @deprecated Room objects are delivered via WebSocket on subscription. This endpoint is not supported by all servers and is not needed. */
   async fetchObjects(room: string, shard: string | null): Promise<void> {
     const mapKey = `${room}/${shard}`
     const res = await this.http.game.roomObjects(room, shard ?? undefined)

@@ -98,10 +98,6 @@ export function RoomViewer(props: RoomViewerProps) {
       .then((t) => setTerrain(t))
       .catch((err) => console.error('Failed to load terrain:', err))
 
-    // Fetch initial room objects
-    c.stores.room.fetchObjects(room, shard)
-      .catch((err) => console.error('Failed to load room objects:', room, shard, err))
-
     // Subscribe to room updates
     group.add(c.stores.room.subscribe(room, shard))
 
