@@ -85,7 +85,7 @@ describe('badgeToSvg', () => {
     expect(svg).toContain('rotate(0 50 50)')
   })
 
-  it('renders a border when requested', () => {
+  it('always renders a black circular border and uses a generous clip radius', () => {
     const badge: Badge = {
       type: 1,
       color1: '#ffffff',
@@ -95,14 +95,10 @@ describe('badgeToSvg', () => {
       flip: false,
     }
 
-    const svgWithBorder = badgeToSvg(badge, { border: true })
-    expect(svgWithBorder).toContain('stroke="#000"')
-    expect(svgWithBorder).toContain('r="47.5"')
-    expect(svgWithBorder).toContain('r="48"')
-
-    const svgWithoutBorder = badgeToSvg(badge)
-    expect(svgWithoutBorder).not.toContain('stroke="#000"')
-    expect(svgWithoutBorder).toContain('r="52"')
+    const svg = badgeToSvg(badge)
+    expect(svg).toContain('stroke="#000"')
+    expect(svg).toContain('r="47.5"')
+    expect(svg).toContain('r="55"')
   })
 
   it('handles badges without path2', () => {

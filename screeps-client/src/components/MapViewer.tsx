@@ -333,7 +333,7 @@ export function MapViewer(props: MapViewerProps) {
       const badgeKey = stat.badge ? JSON.stringify(stat.badge) : ''
       if (roomBadgeKeys.get(room) !== badgeKey) {
         roomBadgeKeys.set(room, badgeKey)
-        renderer?.setRoomBadge(room, stat.badge)
+        renderer?.setRoomBadge(room, stat.badge, stat.own?.level)
       }
 
       const sel = selectedRoom()

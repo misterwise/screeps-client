@@ -41,6 +41,7 @@ interface RoomEntry {
   map2Graphics: Graphics
   ownerOverlay: Graphics
   badgeSprite?: Sprite
+  badgeLevel?: number
   nameLabel: Text
 }
 
@@ -182,6 +183,7 @@ export class MapRenderer {
 
     if (this.getLOD() !== prevLOD) this.applyLOD()
     if ((next >= LOD_ZOOM_THRESHOLD) !== prevZoomAboveThreshold) this.updateAllNameLabels()
+    this.updateBadgeSizes()
     this.callbacks.onZoomChanged?.(next)
     this.setSelectedRoom(this.selectedRoom)
     this.redrawSafeMode()
@@ -402,7 +404,7 @@ export class MapRenderer {
     }
   }
 
-  async setRoomBadge(roomName: string, badge?: Badge): Promise<void> {
+  async setRoomBadge(roomName: string, badge?: Badge, level?: number): Promise<void> {
     const entry = this.activeRooms.get(roomName)
     if (!entry) return
 
@@ -412,6 +414,7 @@ export class MapRenderer {
         entry.badgeSprite.destroy()
         entry.badgeSprite = undefined
       }
+      entry.badgeLevel = undefined
       return
     }
 
@@ -423,6 +426,8 @@ export class MapRenderer {
 
       if (entry.badgeSprite) {
         if (entry.badgeSprite.texture === texture) {
+          entry.badgeLevel = level
+          this.applyBadgeSize(entry)
           return
         }
         entry.badgeSprite.texture = texture
@@ -431,15 +436,33 @@ export class MapRenderer {
         sprite.anchor.set(0.5)
         sprite.x = MAP_ROOM_SIZE / 2
         sprite.y = MAP_ROOM_SIZE / 2
-        sprite.width = 24
-        sprite.height = 24
         // Insert before nameLabel so the label stays on top
         const nameIndex = entry.container.getChildIndex(entry.nameLabel)
         entry.container.addChildAt(sprite, nameIndex)
         entry.badgeSprite = sprite
       }
+
+      entry.badgeLevel = level
+      this.applyBadgeSize(entry)
     } catch (err) {
       console.warn('[MapRenderer] failed to load badge for', roomName, err)
+    }
+  }
+
+  private applyBadgeSize(entry: RoomEntry): void {
+    if (!entry.badgeSprite || entry.badgeLevel === undefined) return
+    const zoom = this.zoom
+    // Level 1 = 12px, Level 7 = 36px on screen at zoom=1.
+    const base = 12 + (entry.badgeLevel - 1) * 4
+    // Scale with zoom up to 100%, then stay constant.
+    const screenSize = base * Math.min(1, zoom)
+    entry.badgeSprite.width = screenSize / zoom
+    entry.badgeSprite.height = screenSize / zoom
+  }
+
+  private updateBadgeSizes(): void {
+    for (const entry of this.activeRooms.values()) {
+      this.applyBadgeSize(entry)
     }
   }
 

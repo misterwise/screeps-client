@@ -11,12 +11,7 @@ function resolveColor(value: string | number | undefined): string {
   return '#000000'
 }
 
-export interface BadgeSvgOptions {
-  border?: boolean
-}
-
-export function badgeToSvg(badge: Badge, options: BadgeSvgOptions = {}): string {
-  const border = options.border ?? false
+export function badgeToSvg(badge: Badge): string {
   const color1 = resolveColor(badge.color1)
   const color2 = resolveColor(badge.color2)
   const color3 = resolveColor(badge.color3)
@@ -50,7 +45,8 @@ export function badgeToSvg(badge: Badge, options: BadgeSvgOptions = {}): string 
     path2 = badge.type.path2
   }
 
-  const clipRadius = border ? 48 : 52
+  // Large radius so badge paths never get clipped.
+  const clipRadius = 55
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 100 100" shape-rendering="geometricPrecision">`
   svg += `<defs><clipPath id="clip"><circle cx="50" cy="50" r="${clipRadius}"/></clipPath></defs>`
@@ -65,9 +61,8 @@ export function badgeToSvg(badge: Badge, options: BadgeSvgOptions = {}): string 
     svg += `<path d="${path2}" fill="${color3}" clip-path="url(#clip)"/>`
   }
 
-  if (border) {
-    svg += `<circle cx="50" cy="50" r="47.5" fill="transparent" stroke="#000" stroke-width="5"/>`
-  }
+  // Black circular border
+  svg += `<circle cx="50" cy="50" r="47.5" fill="transparent" stroke="#000" stroke-width="5"/>`
 
   svg += `</g></svg>`
 
