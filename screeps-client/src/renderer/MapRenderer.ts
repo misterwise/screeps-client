@@ -12,6 +12,10 @@ import {
 export const MAP_TILE_SIZE = 3
 export const MAP_ROOM_SIZE = MAP_TILE_SIZE * 50  // 150px per room
 
+// Screen pixel size for each control level (1–7) at zoom = 1.
+// Adjust these values to tweak how large badges appear per level.
+export const BADGE_SIZES = [12, 16, 20, 24, 28, 32, 36]
+
 // Terrain baked to a GPU texture — two LOD tiers to avoid upscaling blur.
 // LOD 0 (zoom < 1): zoomed out, many rooms, small texture fine
 // LOD 1 (zoom ≥ 1): zoomed in, crisp at native and above
@@ -452,8 +456,7 @@ export class MapRenderer {
   private applyBadgeSize(entry: RoomEntry): void {
     if (!entry.badgeSprite || entry.badgeLevel === undefined) return
     const zoom = this.zoom
-    // Level 1 = 12px, Level 7 = 36px on screen at zoom=1.
-    const base = 12 + (entry.badgeLevel - 1) * 4
+    const base = BADGE_SIZES[entry.badgeLevel - 1] ?? 24
     // Scale with zoom up to 100%, then stay constant.
     const screenSize = base * Math.min(1, zoom)
     entry.badgeSprite.width = screenSize / zoom
@@ -756,6 +759,7 @@ export class MapRenderer {
       this.world.y = e.offsetY - wy * next
       if (this.getLOD() !== prevLOD) this.applyLOD()
       if ((next >= LOD_ZOOM_THRESHOLD) !== prevZoomAboveThreshold) this.updateAllNameLabels()
+      this.updateBadgeSizes()
       this.callbacks.onZoomChanged?.(next)
       this.setSelectedRoom(this.selectedRoom)
     }, { passive: false })
