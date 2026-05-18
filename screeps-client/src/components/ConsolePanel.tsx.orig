@@ -20,9 +20,9 @@ export function ConsolePanel(props: { shard?: string | null; isCollapsed?: boole
     Number(localStorage.getItem('screeps:consoleSplit')) || 50
   )
   const [splitDragging, setSplitDragging] = createSignal(false)
-  let logScrollRef: HTMLDivElement | any
-  let consoleScrollRef: HTMLDivElement | any
-  let splitContainerRef: HTMLDivElement | undefined = undefined
+  let _logScrollRef: HTMLDivElement | undefined
+  let _consoleScrollRef: HTMLDivElement | undefined
+  let _splitContainerRef: HTMLDivElement | undefined
   let nextId = 0
 
   onMount(() => {
@@ -161,7 +161,7 @@ export function ConsolePanel(props: { shard?: string | null; isCollapsed?: boole
 
       {/* Split content – hidden when collapsed */}
       <Show when={!props.isCollapsed}>
-        <div ref={(el) => splitContainerRef = el} style={{ flex: 1, display: 'flex', overflow: 'hidden', 'user-select': splitDragging() ? 'none' : 'auto' }}>
+        <div ref={splitContainerRef} style={{ flex: 1, display: 'flex', overflow: 'hidden', 'user-select': splitDragging() ? 'none' : 'auto' }}>
 
           {/* Log pane */}
           <Show when={showLog()}>
