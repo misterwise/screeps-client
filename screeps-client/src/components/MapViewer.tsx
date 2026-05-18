@@ -30,7 +30,8 @@ export function MapViewer(props: MapViewerProps) {
 
   const [visibleRooms, setVisibleRooms] = createSignal<string[]>([])
   const [zoom, setZoom] = createSignal(1)
-  const [selectedRoom, setSelectedRoom] = createSignal<string | null>(props.originRoom ?? null)
+  const origin = () => props.originRoom
+  const [selectedRoom, setSelectedRoom] = createSignal<string | null>(origin() ?? null)
   let lastSubsActive: boolean | null = null
   let lastRoomsEmpty: boolean | null = null
 
@@ -86,7 +87,7 @@ export function MapViewer(props: MapViewerProps) {
   // Drop local room stats when connection or shard changes
   createEffect(() => {
     client()
-    props.shard
+    void props.shard
     roomStats.clear()
   })
 
@@ -347,7 +348,7 @@ export function MapViewer(props: MapViewerProps) {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <canvas ref={canvasRef} style={{ display: 'block' }} />
+      <canvas ref={(el) => canvasRef = el} style={{ display: 'block' }} />
     </div>
   )
 }

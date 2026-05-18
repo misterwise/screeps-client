@@ -27,7 +27,7 @@ export function RoomViewer(props: RoomViewerProps) {
   let visualLayer: VisualLayer | null = null
   let terrainLayerRef: ReturnType<typeof createTerrainLayer> | null = null
   const [renderer, setRenderer] = createSignal<RoomRenderer | null>(null)
-  const [terrain, setTerrain] = createSignal<RoomTerrain | null>(null)
+  const [terrain, setTerrain] = createSignal<{ room: string, data: RoomTerrain } | null>(null)
   const [objectState, setObjectState] = createSignal<{ objects: RoomObjectMap, diff?: RoomObjectDiff } | null>(null)
   const [visualState, setVisualState] = createSignal<string>('')
 
@@ -72,7 +72,7 @@ export function RoomViewer(props: RoomViewerProps) {
       .then((t) => {
         if (!terrainCancelled) {
           console.log(`[room] terrain loaded — ${room}`)
-          setTerrain(t)
+          setTerrain({ room, data: t })
         }
       })
       .catch((err) => { if (!terrainCancelled) console.error(`[room] terrain load failed for ${room}:`, err) })
@@ -102,8 +102,8 @@ export function RoomViewer(props: RoomViewerProps) {
     const r = renderer()
     if (!r) return
 
-    props.room
-    props.shard
+    void props.room
+    void props.shard
 
     terrainLayerRef?.destroy()
     terrainLayerRef = null
@@ -118,9 +118,9 @@ export function RoomViewer(props: RoomViewerProps) {
 
     // Apply terrain immediately if it arrived before this clear ran
     const t = untrack(terrain)
-    if (t) {
+    if (t && t.room === props.room) {
       console.log(`[room] terrain applied immediately (pre-loaded) — ${props.room}`)
-      terrainLayerRef = createTerrainLayer(t)
+      terrainLayerRef = createTerrainLayer(t.data)
       r.world.addChildAt(terrainLayerRef, 0)
       r.bringNavOverlayToTop()
     }
@@ -166,13 +166,14 @@ export function RoomViewer(props: RoomViewerProps) {
   createEffect(() => {
     const r = renderer()
     const t = terrain()
-    if (!r || !t) return
+    if (!r || !t || t.room !== props.room) return
+
     if (terrainLayerRef?.parent) {
       console.log(`[room] terrain already in scene, skipping — ${props.room}`)
       return
     }
     console.log(`[room] terrain applied (async) — ${props.room}`)
-    terrainLayerRef = createTerrainLayer(t)
+    terrainLayerRef = createTerrainLayer(t.data)
     r.world.addChildAt(terrainLayerRef, 0)
     r.bringNavOverlayToTop()
   })
@@ -302,7 +303,7 @@ export function RoomViewer(props: RoomViewerProps) {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={(el) => containerRef = el} style={{ width: '100%', height: '100%' }} />
       {gameTime() !== null && (
         <div
           style={{

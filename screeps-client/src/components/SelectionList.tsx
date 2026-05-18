@@ -79,7 +79,7 @@ function DefaultDetails(props: { item: SelectedObject }) {
     for (const [k, v] of Object.entries(raw)) {
       if (SKIP_FIELDS.has(k)) continue
       
-      let finalKey = k
+      const finalKey = k
       let finalValue = formatValue(v)
 
       if (k === 'hits' && typeof raw.hitsMax === 'number') {
@@ -194,7 +194,8 @@ function CreepDetails(props: { item: SelectedObject }) {
   )
 }
 
-const CUSTOM_DETAILS: Record<string, (props: { item: SelectedObject }) => any> = {
+import { JSX } from 'solid-js'
+const CUSTOM_DETAILS: Record<string, (props: { item: SelectedObject }) => JSX.Element> = {
   creep: CreepDetails,
 }
 
