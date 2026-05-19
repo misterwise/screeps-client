@@ -162,6 +162,20 @@ export interface ApiGameTickResponse {
   tick: number
 }
 
+export interface ApiPowerCreep {
+  _id: string
+  name: string
+  className: string
+  level: number
+  powers: Record<string, { level: number; cooldownTime?: number }>
+  deleteTime?: number
+}
+
+export interface ApiPowerCreepsListResponse {
+  ok: number
+  list: ApiPowerCreep[]
+}
+
 export interface ApiUserFindResponse {
   ok: number
   user: {

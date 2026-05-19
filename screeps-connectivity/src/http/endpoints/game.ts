@@ -14,6 +14,7 @@ import type {
   ApiCheckUniqueObjectNameResponse,
   ApiGameTickResponse,
 } from '../../types/api.js'
+import { createPowerCreepsEndpoints, type PowerCreepsEndpoints } from './power-creeps.js'
 
 export interface GameEndpoints {
   roomTerrain(room: string, shard?: string | null): Promise<ApiRoomTerrainResponse>
@@ -40,6 +41,7 @@ export interface GameEndpoints {
   setNotifyWhenAttacked(id: string, enabled: boolean): Promise<{ ok: number }>
   createInvader(room: string, x: number, y: number, size: number, type: string, boosted?: boolean): Promise<{ ok: number }>
   removeInvader(id: string): Promise<{ ok: number }>
+  powerCreeps: PowerCreepsEndpoints
   market: {
     ordersIndex(shard?: string | null): Promise<unknown>
     myOrders(): Promise<unknown>
@@ -85,6 +87,7 @@ export function createGameEndpoints(http: HttpClient): GameEndpoints {
     createInvader: (room, x, y, size, type, boosted) => http.request('POST', '/api/game/create-invader', { room, x, y, size, type, ...(boosted != null ? { boosted } : {}) }),
     removeInvader: (id) => http.request('POST', '/api/game/remove-invader', { _id: id }),
     tick: () => http.request('GET', '/api/game/tick'),
+    powerCreeps: createPowerCreepsEndpoints(http),
     market: {
       ordersIndex: (shard) => http.request('GET', '/api/game/market/orders-index', withShard({}, shard)),
       myOrders: () => http.request('GET', '/api/game/market/my-orders'),
