@@ -2,6 +2,7 @@ import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { MapRenderer } from '~/renderer/MapRenderer.js'
 import { client, userInfo, worldBounds, setWorldBounds } from '~/stores/clientStore.js'
 import { showMapRoomNames } from '~/stores/settingsStore.js'
+import { mapOverlayMode } from '~/stores/mapOverlayStore.js'
 import { parseRoomName, formatRoomName, isRoomInWorld } from '~/utils/roomName.js'
 import { useRoomNavigationKeys } from '~/utils/useRoomNavigationKeys.js'
 import type { Map2Subscription } from '@bastianh/screeps-connectivity'
@@ -270,6 +271,11 @@ export function MapViewer(props: MapViewerProps) {
     if (renderer) renderer.currentShard = props.shard ?? 'shard0'
   })
 
+  // Sync overlay mode (owner / mineral / none)
+  createEffect(() => {
+    renderer?.setOverlayMode(mapOverlayMode())
+  })
+
   // Re-fetch world bounds with the correct shard whenever client or shard changes.
   // clientStore fetches without shard on connect which gives NaN bounds on multi-shard servers.
   createEffect(() => {
@@ -329,6 +335,8 @@ export function MapViewer(props: MapViewerProps) {
         renderer?.setRoomOwned(room, owned)
         renderer?.setRoomSafeMode(room, !!stat.safeMode)
       }
+
+      renderer?.setRoomMineral(room, stat.mineral, stat.density)
 
       // Badge change-check: cheap string comparison, runs only on event, never per tick.
       const badgeKey = stat.badge ? JSON.stringify(stat.badge) : ''

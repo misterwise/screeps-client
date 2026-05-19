@@ -8,6 +8,7 @@ import {
   TERRAIN_WALL, TERRAIN_ROAD, TERRAIN_BORDER,
   OBJ_GOLD, OBJ_BLUE, OBJ_CYAN, OBJ_ORANGE,
 } from '~/renderer/colors.js'
+import type { MapOverlayMode } from '~/stores/mapOverlayStore.js'
 
 export const MAP_TILE_SIZE = 3
 export const MAP_ROOM_SIZE = MAP_TILE_SIZE * 50  // 150px per room
@@ -37,6 +38,18 @@ const COLOR_KEEPER     = OBJ_ORANGE  // source keeper lairs
 const COLOR_USER       = 0x4488ff    // player creeps/structures
 const MAP2_FIXED_KEYS  = new Set(['w', 'r', 'pb', 'p', 's', 'c', 'm', 'k'])
 
+const MINERAL_COLORS: Record<string, number> = {
+  H: 0xcccccc,
+  O: 0xcccccc,
+  U: 0x58a6ff,
+  L: 0x3fb950,
+  K: 0xa371f7,
+  Z: 0xd29922,
+  X: 0xf85149,
+}
+
+const MINERAL_DENSITY_SIZES = [16, 24, 32, 40] // screen pixels for density 1–4
+
 interface RoomEntry {
   container: Container
   terrainSprite: Sprite
@@ -47,6 +60,10 @@ interface RoomEntry {
   badgeSprite?: Sprite
   badgeLevel?: number
   nameLabel: Text
+  mineralCircle?: Graphics
+  mineralLabel?: Text
+  mineralDensity?: number
+  mineralColor?: number
 }
 
 export interface MapRendererCallbacks {
@@ -82,6 +99,7 @@ export class MapRenderer {
   private animTargetY = 0
   private isAnimating = false
 
+  private overlayMode: MapOverlayMode = 'owner'
   private isDragging = false
   private hasDragged = false
   private dragStartX = 0
@@ -186,6 +204,8 @@ export class MapRenderer {
     if (this.getLOD() !== prevLOD) this.applyLOD()
     if ((next >= LOD_ZOOM_THRESHOLD) !== prevZoomAboveThreshold) this.updateAllNameLabels()
     this.updateBadgeSizes()
+    this.updateAllNameLabelScales()
+    this.updateAllMineralSizes()
     this.callbacks.onZoomChanged?.(next)
     this.setSelectedRoom(this.selectedRoom)
     this.redrawSafeMode()
@@ -432,6 +452,7 @@ export class MapRenderer {
         if (entry.badgeSprite.texture === texture) {
           entry.badgeLevel = level
           this.applyBadgeSize(entry)
+          this.applyOverlayMode(entry)
           return
         }
         entry.badgeSprite.texture = texture
@@ -448,6 +469,7 @@ export class MapRenderer {
 
       entry.badgeLevel = level
       this.applyBadgeSize(entry)
+      this.applyOverlayMode(entry)
     } catch (err) {
       console.warn('[MapRenderer] failed to load badge for', roomName, err)
     }
@@ -466,6 +488,113 @@ export class MapRenderer {
   private updateBadgeSizes(): void {
     for (const entry of this.activeRooms.values()) {
       this.applyBadgeSize(entry)
+    }
+  }
+
+  setOverlayMode(mode: MapOverlayMode): void {
+    if (this.overlayMode === mode) return
+    this.overlayMode = mode
+    for (const entry of this.activeRooms.values()) {
+      this.applyOverlayMode(entry)
+    }
+  }
+
+  setRoomMineral(roomName: string, mineral?: string, density?: number): void {
+    const entry = this.activeRooms.get(roomName)
+    if (!entry) return
+
+    if (!mineral || !density) {
+      if (entry.mineralCircle) {
+        entry.container.removeChild(entry.mineralCircle)
+        entry.mineralCircle.destroy()
+        entry.mineralCircle = undefined
+      }
+      if (entry.mineralLabel) {
+        entry.container.removeChild(entry.mineralLabel)
+        entry.mineralLabel.destroy()
+        entry.mineralLabel = undefined
+      }
+      entry.mineralDensity = undefined
+      return
+    }
+
+    const color = MINERAL_COLORS[mineral] ?? OBJ_CYAN
+    entry.mineralDensity = density
+    entry.mineralColor = color
+
+    if (!entry.mineralCircle) {
+      const circle = new Graphics()
+      circle.x = MAP_ROOM_SIZE / 2
+      circle.y = MAP_ROOM_SIZE / 2
+      const nameIndex = entry.container.getChildIndex(entry.nameLabel)
+      entry.container.addChildAt(circle, nameIndex)
+      entry.mineralCircle = circle
+    }
+
+    if (!entry.mineralLabel) {
+      const label = new Text({
+        text: mineral,
+        style: { fontSize: 36, fill: 0xffffff, fontFamily: 'ui-monospace, monospace', fontWeight: 'bold' },
+      })
+      label.anchor.set(0.5)
+      label.x = MAP_ROOM_SIZE / 2
+      label.y = MAP_ROOM_SIZE / 2
+      entry.container.addChild(label)
+      entry.mineralLabel = label
+    } else {
+      entry.mineralLabel.text = mineral
+    }
+
+    this.applyMineralSize(entry)
+    this.applyOverlayMode(entry)
+  }
+
+  private applyOverlayMode(entry: RoomEntry): void {
+    if (entry.badgeSprite) {
+      entry.badgeSprite.visible = this.overlayMode === 'owner'
+    }
+    if (entry.mineralCircle) {
+      entry.mineralCircle.visible = this.overlayMode === 'mineral'
+    }
+    if (entry.mineralLabel) {
+      entry.mineralLabel.visible = this.overlayMode === 'mineral'
+    }
+  }
+
+  private applyMineralSize(entry: RoomEntry): void {
+    if (!entry.mineralCircle || !entry.mineralLabel || entry.mineralDensity === undefined || entry.mineralColor === undefined) return
+    const zoom = this.zoom
+    const scaleFactor = Math.max(0.5, Math.min(1.5, zoom))
+    const screenDiameter = (MINERAL_DENSITY_SIZES[entry.mineralDensity - 1] ?? 24) * scaleFactor
+    const worldRadius = (screenDiameter / 2) / zoom
+
+    entry.mineralCircle.clear()
+    entry.mineralCircle.circle(0, 0, 1)
+    entry.mineralCircle.fill(entry.mineralColor)
+    const borderScreenWidth = 2
+    const borderWorldWidth = borderScreenWidth / zoom
+    entry.mineralCircle.stroke({ color: 0x000000, width: borderWorldWidth / worldRadius })
+    entry.mineralCircle.scale.set(worldRadius)
+
+    const labelScreenHeight = screenDiameter * 0.55
+    const labelScale = (labelScreenHeight / 36) / zoom
+    entry.mineralLabel.scale.set(labelScale)
+  }
+
+  private updateAllMineralSizes(): void {
+    for (const entry of this.activeRooms.values()) {
+      this.applyMineralSize(entry)
+    }
+  }
+
+  private updateNameLabelScale(entry: RoomEntry): void {
+    const baseScale = 0.5
+    entry.nameLabel.scale.set(baseScale / this.zoom)
+  }
+
+  private updateAllNameLabelScales(): void {
+    for (const entry of this.activeRooms.values()) {
+      this.updateNameLabelScale(entry)
     }
   }
 
@@ -562,6 +691,18 @@ export class MapRenderer {
       entry.badgeSprite.destroy()
       entry.badgeSprite = undefined
     }
+    if (entry.mineralCircle) {
+      entry.container.removeChild(entry.mineralCircle)
+      entry.mineralCircle.destroy()
+      entry.mineralCircle = undefined
+    }
+    if (entry.mineralLabel) {
+      entry.container.removeChild(entry.mineralLabel)
+      entry.mineralLabel.destroy()
+      entry.mineralLabel = undefined
+    }
+    entry.mineralDensity = undefined
+    entry.mineralColor = undefined
     entry.container.visible = false
     this.safeModeRooms.delete(roomName)
 
@@ -667,7 +808,8 @@ export class MapRenderer {
     entry.container.y = coord.y * MAP_ROOM_SIZE
     entry.container.visible = true
     entry.nameLabel.text = roomName
-    entry.nameLabel.visible = this.nameLabelShouldShow(coord.x, coord.y)
+    entry.nameLabel.visible = this.showRoomNames && this.zoom >= LOD_ZOOM_THRESHOLD && this.nameLabelShouldShow(coord.x, coord.y)
+    this.updateNameLabelScale(entry)
 
     // Reset pooled badge sprite so a stale badge from a previous room doesn't leak through
     if (entry.badgeSprite) {
@@ -675,6 +817,20 @@ export class MapRenderer {
       entry.badgeSprite.destroy()
       entry.badgeSprite = undefined
     }
+
+    // Reset pooled mineral graphics
+    if (entry.mineralCircle) {
+      entry.container.removeChild(entry.mineralCircle)
+      entry.mineralCircle.destroy()
+      entry.mineralCircle = undefined
+    }
+    if (entry.mineralLabel) {
+      entry.container.removeChild(entry.mineralLabel)
+      entry.mineralLabel.destroy()
+      entry.mineralLabel = undefined
+    }
+    entry.mineralDensity = undefined
+    entry.mineralColor = undefined
 
     // Keep overlays on top
     if (this.safeModeGraphics) {
@@ -797,6 +953,8 @@ export class MapRenderer {
       if (this.getLOD() !== prevLOD) this.applyLOD()
       if ((next >= LOD_ZOOM_THRESHOLD) !== prevZoomAboveThreshold) this.updateAllNameLabels()
       this.updateBadgeSizes()
+      this.updateAllNameLabelScales()
+      this.updateAllMineralSizes()
       this.callbacks.onZoomChanged?.(next)
       this.setSelectedRoom(this.selectedRoom)
       this.redrawSafeMode()

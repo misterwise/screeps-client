@@ -1,9 +1,17 @@
+import { For } from 'solid-js'
 import { showMapRoomNames, setShowMapRoomNames } from '~/stores/settingsStore.js'
+import { mapOverlayMode, setMapOverlayMode, type MapOverlayMode } from '~/stores/mapOverlayStore.js'
 
 interface MapInfoPanelProps {
   zoom?: number | null
   subsActive?: boolean | null
 }
+
+const OVERLAY_MODES: Array<{ mode: MapOverlayMode; label: string }> = [
+  { mode: 'owner', label: 'Owner' },
+  { mode: 'mineral', label: 'Mineral' },
+  { mode: 'none', label: 'None' },
+]
 
 export function MapInfoPanel(props: MapInfoPanelProps) {
   return (
@@ -61,6 +69,39 @@ export function MapInfoPanel(props: MapInfoPanelProps) {
             onChange={(e) => setShowMapRoomNames(e.currentTarget.checked)}
           />
         </label>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          'grid-template-columns': 'repeat(3, 1fr)',
+          gap: '4px',
+          'margin-top': '8px',
+        }}
+      >
+        <For each={OVERLAY_MODES}>
+          {(entry) => {
+            const active = () => mapOverlayMode() === entry.mode
+            return (
+              <button
+                type="button"
+                onClick={() => setMapOverlayMode(entry.mode)}
+                style={{
+                  padding: '5px 8px',
+                  'border-radius': '6px',
+                  border: `1px solid ${active() ? '#58a6ff' : '#30363d'}`,
+                  background: active() ? '#1f6feb33' : '#161b22',
+                  color: active() ? '#c9d1d9' : '#8b949e',
+                  cursor: 'pointer',
+                  'font-size': '11px',
+                  'font-weight': 600,
+                }}
+              >
+                {entry.label}
+              </button>
+            )
+          }}
+        </For>
       </div>
     </div>
   )
