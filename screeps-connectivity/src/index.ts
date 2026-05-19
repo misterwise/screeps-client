@@ -7,6 +7,7 @@ export type { LogFn } from './logger.js'
 export { TokenAuth } from './http/auth/TokenAuth.js'
 export { PasswordAuth } from './http/auth/PasswordAuth.js'
 export { GuestAuth } from './http/auth/GuestAuth.js'
+export { SteamTicketAuth } from './http/auth/SteamTicketAuth.js'
 export type { AuthStrategy } from './http/auth/AuthStrategy.js'
 
 export { IndexedDBStorage } from './storage/IndexedDBStorage.js'

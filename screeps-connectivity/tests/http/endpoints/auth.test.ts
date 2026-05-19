@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { HttpClient } from '../../../src/http/HttpClient.js'
 import { TokenAuth } from '../../../src/http/auth/TokenAuth.js'
+import { SteamTicketAuth } from '../../../src/http/auth/SteamTicketAuth.js'
 
 function mockResponse(body: unknown, opts: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -40,6 +41,42 @@ describe('auth endpoints', () => {
     await http.auth.steamTicket('ticket-value', true)
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body).toEqual({ ticket: 'ticket-value', useNativeAuth: true })
+  })
+})
+
+describe('SteamTicketAuth strategy', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('authenticate() calls steam-ticket and returns the token', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: 1, token: 'steam-tok', steamid: 'sid' }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }))
+    const http = new HttpClient({ url: 'http://test.local', auth: new TokenAuth({ token: '' }) })
+    const strategy = new SteamTicketAuth({ ticket: 'my-steam-ticket' })
+    const token = await strategy.authenticate(http)
+    expect(token).toBe('steam-tok')
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(body).toEqual({ ticket: 'my-steam-ticket' })
+  })
+
+  it('passes useNativeAuth when set', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: 1, token: 't', steamid: 's' }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }))
+    const http = new HttpClient({ url: 'http://test.local', auth: new TokenAuth({ token: '' }) })
+    const strategy = new SteamTicketAuth({ ticket: 'ticket', useNativeAuth: true })
+    await strategy.authenticate(http)
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(body.useNativeAuth).toBe(true)
   })
 })
 
