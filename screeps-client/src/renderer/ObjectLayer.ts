@@ -688,6 +688,8 @@ function createObjectVisual(
       g.fill(secColor)
 
       container.addChild(g)
+      ;(container as ContainerWithTarget).__flagColor = colorIdx
+      ;(container as ContainerWithTarget).__flagSecondaryColor = secColorIdx
 
       // Label with flag name
       if (typeof obj.name === 'string') {
@@ -771,6 +773,8 @@ type ContainerWithTarget = Container & {
   __ctrlLevel?: number
   __ctrlProgress?: number
   __ctrlProgressTotal?: number
+  __flagColor?: number
+  __flagSecondaryColor?: number
 }
 
 interface ExtAnimation {
@@ -1006,6 +1010,24 @@ export class ObjectLayer {
                 existing.__creepUsed = used
                 existing.__creepCapacity = capacity
               }
+            } else if (obj.type === 'flag') {
+              const newColorIdx = typeof obj.color === 'number' ? obj.color : 0
+              const newSecColorIdx = typeof obj.secondaryColor === 'number' ? obj.secondaryColor : 0
+              const colorChanged =
+                existing.__flagColor !== newColorIdx ||
+                existing.__flagSecondaryColor !== newSecColorIdx
+              if (colorChanged) {
+                this.container.removeChild(existing)
+                existing.destroy()
+                this.objects.delete(id)
+                const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users)
+                visual.__tileX = obj.x
+                visual.__tileY = obj.y
+                this.objects.set(id, visual)
+                this.container.addChild(visual)
+              } else {
+                existing.position.set(tx, ty)
+              }
             } else {
               existing.position.set(tx, ty)
             }
@@ -1088,6 +1110,24 @@ export class ObjectLayer {
               this.startCreepFillAnimation(id, existing, existing.__creepUsed ?? 0, existing.__creepCapacity ?? capacity, used, capacity)
               existing.__creepUsed = used
               existing.__creepCapacity = capacity
+            }
+          } else if (obj.type === 'flag') {
+            const newColorIdx = typeof obj.color === 'number' ? obj.color : 0
+            const newSecColorIdx = typeof obj.secondaryColor === 'number' ? obj.secondaryColor : 0
+            const colorChanged =
+              existing.__flagColor !== newColorIdx ||
+              existing.__flagSecondaryColor !== newSecColorIdx
+            if (colorChanged) {
+              this.container.removeChild(existing)
+              existing.destroy()
+              this.objects.delete(id)
+              const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users)
+              visual.__tileX = obj.x
+              visual.__tileY = obj.y
+              this.objects.set(id, visual)
+              this.container.addChild(visual)
+            } else {
+              existing.position.set(tx, ty)
             }
           } else {
             existing.position.set(tx, ty)

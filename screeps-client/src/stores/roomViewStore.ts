@@ -27,6 +27,17 @@ export interface PendingTile {
   ty: number
 }
 
+export interface MoveFlagAction {
+  type: 'moveFlag'
+  id: string
+  name: string
+  room: string
+  color: number
+  secondaryColor: number
+}
+
+export type OverlayAction = MoveFlagAction | null
+
 const [roomViewMode, setRoomViewMode] = createSignal<RoomViewMode>('view')
 const [flagDraft, setFlagDraft] = createSignal<FlagDraft>({
     name: '',
@@ -34,14 +45,40 @@ const [flagDraft, setFlagDraft] = createSignal<FlagDraft>({
     secondaryColor: 'COLOR_WHITE',
 })
 const [pendingTile, setPendingTile] = createSignal<PendingTile | null>(null)
+const [overlayAction, setOverlayAction] = createSignal<OverlayAction>(null)
 
-export { roomViewMode, setRoomViewMode, flagDraft, setFlagDraft, pendingTile, setPendingTile }
+export { roomViewMode, setRoomViewMode, flagDraft, setFlagDraft, pendingTile, setPendingTile, overlayAction, setOverlayAction }
 
 export function clearPendingTile(): void {
   setPendingTile(null)
 }
 
+export function clearOverlayAction(): void {
+  setOverlayAction(null)
+}
+
 export function resetRoomViewMode(): void {
     setRoomViewMode('view')
     clearPendingTile()
+    clearOverlayAction()
+}
+
+export function modeHint(): string | null {
+  const mode = roomViewMode()
+  const pending = pendingTile()
+  const overlay = overlayAction()
+
+  if (overlay?.type === 'moveFlag') {
+    return 'Choose new flag position'
+  }
+
+  if (mode === 'flag') {
+    return pending ? 'Confirm position' : 'Choose position'
+  }
+
+  if (mode === 'build') {
+    return pending ? 'Confirm position' : 'Choose position'
+  }
+
+  return null
 }

@@ -14,7 +14,7 @@ import { parseRoomName, formatRoomName, isRoomInWorld } from '~/utils/roomName.j
 import { useRoomNavigationKeys } from '~/utils/useRoomNavigationKeys.js'
 import type { RoomTerrain, RoomObjectMap, RoomObjectDiff } from '@bastianh/screeps-connectivity'
 import { SubscriptionGroup } from '@bastianh/screeps-connectivity'
-import {flagDraft, roomViewMode, FLAG_COLOR_MAP, pendingTile, setPendingTile, clearPendingTile, setFlagDraft} from '~/stores/roomViewStore';
+import {flagDraft, roomViewMode, FLAG_COLOR_MAP, pendingTile, setPendingTile, clearPendingTile, setFlagDraft, modeHint, overlayAction, clearOverlayAction} from '~/stores/roomViewStore';
 
 interface RoomViewerProps {
   room: string
@@ -129,6 +129,7 @@ export function RoomViewer(props: RoomViewerProps) {
     void props.shard
 
     clearPendingTile()
+    clearOverlayAction()
     r.hoverLayer.clearPendingTile()
 
     terrainLayerRef?.destroy()
@@ -243,6 +244,31 @@ export function RoomViewer(props: RoomViewerProps) {
           (_tx, _ty) => {},
           (tx, ty, ctrlKey) => {
             const mode = roomViewMode()
+
+            const overlay = overlayAction()
+
+            if (overlay?.type === 'moveFlag') {
+              const c = client()
+              if (!c) return
+
+              const { name, room, color, secondaryColor } = overlay
+              c.http.game.removeFlag(room, name)
+                .then(() => {
+                  return c.http.game.createFlag(
+                    props.room, tx, ty, name, color, secondaryColor, props.shard ?? undefined
+                  )
+                })
+                .then(() => {
+                  addToast(`Flag "${name}" moved`, 'success')
+                  clearOverlayAction()
+                })
+                .catch((err) => {
+                  console.error('[room] move flag failed:', err)
+                  addToast(`Failed to move flag "${name}"`, 'error')
+                  clearOverlayAction()
+                })
+              return
+            }
 
             if (mode === 'flag') {
               const pending = pendingTile()
@@ -387,6 +413,29 @@ export function RoomViewer(props: RoomViewerProps) {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={(el) => containerRef = el} style={{ width: '100%', height: '100%' }} />
+      {modeHint() && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '12px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '6px 16px',
+            'border-radius': '6px',
+            background: 'rgba(13, 17, 23, 0.65)',
+            border: '1px solid rgba(48, 54, 61, 0.6)',
+            'font-size': '13px',
+            'font-weight': 500,
+            color: '#c9d1d9',
+            'pointer-events': 'none',
+            'user-select': 'none',
+            'white-space': 'nowrap',
+            'z-index': 10,
+          }}
+        >
+          {modeHint()}
+        </div>
+      )}
       {gameTime() !== null && (
         <div
           style={{
@@ -399,6 +448,7 @@ export function RoomViewer(props: RoomViewerProps) {
             border: '1px solid #30363d',
             'font-size': '12px',
             color: '#8b949e',
+            'z-index': 10,
           }}
         >
           Tick {gameTime()}

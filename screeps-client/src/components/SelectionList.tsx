@@ -1,6 +1,7 @@
-import { For, Show } from 'solid-js'
+import { For, Show, createSignal, createEffect } from 'solid-js'
 import { selection, deselectItem } from '~/stores/selectionStore.js'
 import { client, gameTime } from '~/stores/clientStore.js'
+import { overlayAction, setOverlayAction } from '~/stores/roomViewStore.js'
 import type { SelectedObject } from '~/stores/selectionStore.js'
 
 // Mirror the palette from ObjectLayer so colors match
@@ -224,14 +225,66 @@ function FlagDetails(props: { item: SelectedObject }) {
   const currentSecondaryColor = () =>
     typeof raw().secondaryColor === 'number' ? (raw().secondaryColor as number) : 1
 
-  const handleColorChange = (color: number, secondaryColor: number) => {
+  const [draftColor, setDraftColor] = createSignal(currentColor())
+  const [draftSecondaryColor, setDraftSecondaryColor] = createSignal(currentSecondaryColor())
+
+  createEffect(() => {
+    setDraftColor(currentColor())
+    setDraftSecondaryColor(currentSecondaryColor())
+  })
+
+  const hasChanges = () =>
+    draftColor() !== currentColor() || draftSecondaryColor() !== currentSecondaryColor()
+
+  const handleApply = () => {
     const c = client()
     if (!c) return
-    c.http.game.changeFlagColor(room(), name(), color, secondaryColor).catch(() => {})
+    const primary = draftColor()
+    const secondary = draftSecondaryColor()
+    console.log(`[SelectionList] changeFlagColor: name="${name()}" room=${room()} primary=${primary} secondary=${secondary}`)
+    c.http.game.changeFlagColor(room(), name(), primary, secondary)
+      .then(() => console.log(`[SelectionList] changeFlagColor OK`))
+      .catch((err: Error) => console.error(`[SelectionList] changeFlagColor FAILED:`, err))
   }
 
+  const isMovingThisFlag = () => {
+    const oa = overlayAction()
+    return oa?.type === 'moveFlag' && oa.id === props.item.id
+  }
+
+  const handleMoveToggle = () => {
+    if (isMovingThisFlag()) {
+      setOverlayAction(null)
+      return
+    }
+    setOverlayAction({
+      type: 'moveFlag',
+      id: props.item.id,
+      name: name(),
+      room: room(),
+      color: draftColor(),
+      secondaryColor: draftSecondaryColor(),
+    })
+  }
+
+  const [confirming, setConfirming] = createSignal(false)
+  let confirmTimeout: ReturnType<typeof setTimeout> | null = null
+
   const handleDelete = () => {
-    if (!window.confirm(`Delete flag "${name()}"?`)) return
+    if (!confirming()) {
+      setConfirming(true)
+      confirmTimeout = setTimeout(() => {
+        setConfirming(false)
+      }, 3000)
+      return
+    }
+
+    if (confirmTimeout) {
+      clearTimeout(confirmTimeout)
+      confirmTimeout = null
+    }
+    setConfirming(false)
+
     const c = client()
     if (!c) return
     c.http.game.removeFlag(room(), name())
@@ -264,8 +317,8 @@ function FlagDetails(props: { item: SelectedObject }) {
       <label style={labelStyle}>
         Primary color
         <select
-          value={currentColor()}
-          onChange={(e) => handleColorChange(Number(e.currentTarget.value), currentSecondaryColor())}
+          value={draftColor()}
+          onChange={(e) => setDraftColor(Number(e.currentTarget.value))}
           style={selectStyle}
         >
           <For each={FLAG_COLOR_OPTIONS}>
@@ -277,8 +330,8 @@ function FlagDetails(props: { item: SelectedObject }) {
       <label style={labelStyle}>
         Secondary color
         <select
-          value={currentSecondaryColor()}
-          onChange={(e) => handleColorChange(currentColor(), Number(e.currentTarget.value))}
+          value={draftSecondaryColor()}
+          onChange={(e) => setDraftSecondaryColor(Number(e.currentTarget.value))}
           style={selectStyle}
         >
           <For each={FLAG_COLOR_OPTIONS}>
@@ -288,9 +341,55 @@ function FlagDetails(props: { item: SelectedObject }) {
       </label>
 
       <button
+        onClick={handleApply}
+        disabled={!hasChanges()}
+        style={{
+          background: hasChanges() ? '#238636' : '#1f6feb',
+          color: '#fff',
+          border: 'none',
+          'border-radius': '4px',
+          padding: '6px 8px',
+          'font-size': '12px',
+          cursor: hasChanges() ? 'pointer' : 'not-allowed',
+          opacity: hasChanges() ? 1 : 0.6,
+          transition: 'opacity 150ms ease, background 150ms ease',
+        }}
+        onMouseEnter={(e) => {
+          if (hasChanges()) e.currentTarget.style.background = '#2ea043'
+        }}
+        onMouseLeave={(e) => {
+          if (hasChanges()) e.currentTarget.style.background = '#238636'
+        }}
+      >
+        Apply color
+      </button>
+
+      <button
+        onClick={handleMoveToggle}
+        style={{
+          background: isMovingThisFlag() ? '#8b949e' : '#d29922',
+          color: '#fff',
+          border: 'none',
+          'border-radius': '4px',
+          padding: '6px 8px',
+          'font-size': '12px',
+          cursor: 'pointer',
+          transition: 'background 150ms ease',
+        }}
+        onMouseEnter={(e) => {
+          if (!isMovingThisFlag()) e.currentTarget.style.background = '#e3b341'
+        }}
+        onMouseLeave={(e) => {
+          if (!isMovingThisFlag()) e.currentTarget.style.background = '#d29922'
+        }}
+      >
+        {isMovingThisFlag() ? 'Abort' : 'Move flag'}
+      </button>
+
+      <button
         onClick={handleDelete}
         style={{
-          background: '#f85149',
+          background: confirming() ? '#da3633' : '#f85149',
           color: '#fff',
           border: 'none',
           'border-radius': '4px',
@@ -298,11 +397,16 @@ function FlagDetails(props: { item: SelectedObject }) {
           'font-size': '12px',
           cursor: 'pointer',
           'margin-top': '4px',
+          transition: 'background 150ms ease',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#da3633')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = '#f85149')}
+        onMouseEnter={(e) => {
+          if (!confirming()) e.currentTarget.style.background = '#da3633'
+        }}
+        onMouseLeave={(e) => {
+          if (!confirming()) e.currentTarget.style.background = '#f85149'
+        }}
       >
-        Delete flag
+        {confirming() ? 'Confirm deletion' : 'Delete flag'}
       </button>
     </div>
   )
