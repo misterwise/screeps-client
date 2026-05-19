@@ -120,26 +120,12 @@ export function LoginForm() {
         <label style={{ display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
           <span style={{ 'font-size': '12px', color: '#8b949e' }}>Server URL</span>
           <input
-            type="text"
+            type="url"
+            name="url"
+            autocomplete="url"
+            inputmode="url"
             value={url()}
             onInput={(e) => setUrl(e.currentTarget.value)}
-            style={{
-              padding: '8px 12px',
-              'border-radius': '6px',
-              border: '1px solid #30363d',
-              background: '#0d1117',
-              color: '#c9d1d9',
-            }}
-          />
-        </label>
-
-        <label style={{ display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
-          <span style={{ 'font-size': '12px', color: '#8b949e' }}>Server Password <span style={{ color: '#484f58' }}>(optional)</span></span>
-          <input
-            type="password"
-            value={serverPassword()}
-            onInput={(e) => setServerPassword(e.currentTarget.value)}
-            placeholder="Leave empty if not required"
             style={{
               padding: '8px 12px',
               'border-radius': '6px',
@@ -156,6 +142,9 @@ export function LoginForm() {
               <span style={{ 'font-size': '12px', color: '#8b949e' }}>Email or Username</span>
               <input
                 type="text"
+                id="username"
+                name="username"
+                autocomplete="username"
                 value={email()}
                 onInput={(e) => setEmail(e.currentTarget.value)}
                 style={{
@@ -171,6 +160,9 @@ export function LoginForm() {
               <span style={{ 'font-size': '12px', color: '#8b949e' }}>Password</span>
               <input
                 type="password"
+                id="password"
+                name="password"
+                autocomplete="current-password"
                 value={password()}
                 onInput={(e) => setPassword(e.currentTarget.value)}
                 style={{
@@ -188,6 +180,8 @@ export function LoginForm() {
             <span style={{ 'font-size': '12px', color: '#8b949e' }}>Auth Token</span>
             <input
               type="password"
+              name="token"
+              autocomplete="off"
               value={token()}
               onInput={(e) => setToken(e.currentTarget.value)}
               style={{
@@ -200,6 +194,27 @@ export function LoginForm() {
             />
           </label>
         )}
+
+        <label style={{ display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
+          <span style={{ 'font-size': '12px', color: '#8b949e' }}>Server Password <span style={{ color: '#484f58' }}>(optional)</span></span>
+          <input
+            type="password"
+            name="server-password"
+            autocomplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            value={serverPassword()}
+            onInput={(e) => setServerPassword(e.currentTarget.value)}
+            placeholder="Leave empty if not required"
+            style={{
+              padding: '8px 12px',
+              'border-radius': '6px',
+              border: '1px solid #30363d',
+              background: '#0d1117',
+              color: '#c9d1d9',
+            }}
+          />
+        </label>
 
         {error() && (
           <div style={{ color: '#f85149', 'font-size': '13px' }}>{error()}</div>
