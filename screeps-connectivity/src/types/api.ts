@@ -30,6 +30,16 @@ export interface ApiAuthSteamTicketResponse {
   steamid: string
 }
 
+export interface ApiAuthModInfoResponse {
+  ok: number
+  name: string
+  version: string
+  allowRegistration: boolean
+  steam: boolean
+  github: boolean
+  gitlab: boolean
+}
+
 export interface ApiRegisterCheckResponse {
   ok: number
   error?: string

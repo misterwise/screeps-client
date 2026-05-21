@@ -46,6 +46,8 @@ export interface UserEndpoints {
   tutorialDone(): Promise<{ ok: number }>
   email(email: string): Promise<{ ok: number }>
   setSteamVisible(visible: boolean): Promise<{ ok: number }>
+  /** Change the current user's password (screepsmod-auth private servers only). Pass oldPassword when the account already has a password set. */
+  password(newPassword: string, oldPassword?: string): Promise<{ ok: number }>
   messages: UserMessagesEndpoints
 }
 
@@ -87,6 +89,7 @@ export function createUserEndpoints(http: HttpClient): UserEndpoints {
     tutorialDone: () => http.request('POST', '/api/user/tutorial-done'),
     email: (email) => http.request('POST', '/api/user/email', { email }),
     setSteamVisible: (visible) => http.request('POST', '/api/user/set-steam-visible', { visible }),
+    password: (newPassword, oldPassword) => http.request('POST', '/api/user/password', { password: newPassword, ...(oldPassword != null ? { oldPassword } : {}) }),
     messages: createUserMessagesEndpoints(http),
   }
 }
