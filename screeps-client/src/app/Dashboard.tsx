@@ -15,9 +15,11 @@ import { toggleShowLog, toggleShowConsole } from '~/stores/consoleStore.js'
 import { setRoomViewMode } from '~/stores/roomViewStore.js'
 
 import { parseRoomName } from '~/utils/roomName.js'
+import { basePath } from '~/utils/embedded.js'
 
 function parseRoomUrl(): { room: string | null; shard: string | null } {
-  const match = window.location.pathname.match(/^\/room\/([A-Za-z0-9]+)/)
+  const base = basePath()
+  const match = window.location.pathname.match(new RegExp(`^${base}/room/([A-Za-z0-9]+)`))
   if (!match) return { room: null, shard: null }
   const room = match[1].toUpperCase()
   if (!parseRoomName(room)) return { room: null, shard: null }
@@ -26,15 +28,15 @@ function parseRoomUrl(): { room: string | null; shard: string | null } {
 }
 
 function buildRoomUrl(room: string, shard: string | null): string {
-  return `/room/${room}${shard ? `?shard=${encodeURIComponent(shard)}` : ''}`
+  return `${basePath()}/room/${room}${shard ? `?shard=${encodeURIComponent(shard)}` : ''}`
 }
 
 function buildMapUrl(shard: string | null): string {
-  return `/map${shard ? `?shard=${encodeURIComponent(shard)}` : ''}`
+  return `${basePath()}/map${shard ? `?shard=${encodeURIComponent(shard)}` : ''}`
 }
 
 function parseMapUrl(): { shard: string | null } | null {
-  if (!window.location.pathname.startsWith('/map')) return null
+  if (!window.location.pathname.startsWith(`${basePath()}/map`)) return null
   const shard = new URLSearchParams(window.location.search).get('shard')
   return { shard }
 }

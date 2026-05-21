@@ -29,8 +29,16 @@ module.exports = function (config) {
   const rootRedirect = readBool('SCREEPS_MOD_CLIENT_ROOT_REDIRECT', modCfg.rootRedirect, true)
   const distDir = path.join(__dirname, 'dist')
 
+  const indexFile = path.join(distDir, 'index.html')
+
   config.backend.on('expressPreConfig', (app) => {
     app.use(mountPath, express.static(distDir, { fallthrough: true }))
+
+    // SPA fallback: serve index.html for unmatched GET requests under mountPath
+    app.use(mountPath, (req, res, next) => {
+      if (req.method !== 'GET') return next()
+      res.sendFile(indexFile)
+    })
 
     if (rootRedirect && mountPath !== '/') {
       app.get('/', (_req, res) => {

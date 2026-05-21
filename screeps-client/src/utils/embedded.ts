@@ -9,3 +9,9 @@ export function isEmbedded(): boolean {
 export function embeddedServerUrl(): string {
   return window.location.origin
 }
+
+// Returns the path prefix where the app is mounted, without trailing slash.
+// e.g. '/client' when mounted as a server mod, '' for standalone.
+export function basePath(): string {
+  return import.meta.env.BASE_URL.replace(/\/$/, '')
+}

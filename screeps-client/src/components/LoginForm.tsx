@@ -86,38 +86,40 @@ export function LoginForm() {
       >
         <h2 style={{ margin: 0, 'font-size': '20px' }}>Connect to Screeps</h2>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={() => setAuthType('password')}
-            style={{
-              flex: 1,
-              padding: '8px',
-              'border-radius': '6px',
-              border: '1px solid #30363d',
-              background: authType() === 'password' ? '#238636' : 'transparent',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthType('token')}
-            style={{
-              flex: 1,
-              padding: '8px',
-              'border-radius': '6px',
-              border: '1px solid #30363d',
-              background: authType() === 'token' ? '#238636' : 'transparent',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            Token
-          </button>
-        </div>
+        <Show when={!embedded}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setAuthType('password')}
+              style={{
+                flex: 1,
+                padding: '8px',
+                'border-radius': '6px',
+                border: '1px solid #30363d',
+                background: authType() === 'password' ? '#238636' : 'transparent',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthType('token')}
+              style={{
+                flex: 1,
+                padding: '8px',
+                'border-radius': '6px',
+                border: '1px solid #30363d',
+                background: authType() === 'token' ? '#238636' : 'transparent',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Token
+            </button>
+          </div>
+        </Show>
 
         <Show when={!embedded}>
           <label style={{ display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
