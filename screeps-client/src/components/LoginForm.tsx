@@ -280,7 +280,11 @@ export function LoginForm() {
 
   const welcomeText = () => serverVersion()?.serverData?.welcomeText ?? null
   const mods = () => (serverVersion()?.serverData?.features ?? []).filter(f => f.name !== 'auth' && f.version != null)
-  const hasSteam = () => getScreepsmodAuth(serverVersion()!)?.authTypes?.includes('steam') ?? (serverVersion() == null)
+  const hasSteam = () => {
+    const v = serverVersion()
+    if (!v) return true
+    return getScreepsmodAuth(v)?.authTypes?.includes('steam') ?? true
+  }
   const canRegister = () => authModInfo()?.allowRegistration === true
 
   const handleSteamLogin = () => {
