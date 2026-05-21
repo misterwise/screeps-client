@@ -315,6 +315,10 @@ export function MapViewer(props: MapViewerProps) {
     const c = client()
     if (!c) return
 
+    // Long-lived listener: must read live props.shard at invocation time to
+    // filter for the currently viewed shard. The reactivity lint is suppressed
+    // because re-binding on every shard change would drop in-flight events.
+    // eslint-disable-next-line solid/reactivity
     const sub = c.stores.map.on('room:map2update', ({ room, shard, data, source }) => {
       if (shard !== props.shard) return
       renderer?.setRoomMap2(room, data, source)
@@ -331,6 +335,7 @@ export function MapViewer(props: MapViewerProps) {
     const me = userInfo()?._id
     const visibleSet = new Set(visibleRooms())
 
+    // eslint-disable-next-line solid/reactivity
     const sub = c.stores.mapStats.on('mapStats:room', ({ room, stat }) => {
       roomStats.set(room, stat)
       const owned = !!(stat.own && stat.own.user !== me)

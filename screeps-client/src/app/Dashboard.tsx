@@ -50,7 +50,7 @@ function HeaderButton(props: {
 }) {
   return (
     <button
-      onClick={props.onClick}
+      onClick={() => props.onClick()}
       style={{
         padding: '6px 14px',
         'border-radius': '4px',
@@ -71,7 +71,7 @@ function NavArrowButton(props: { disabled: boolean; onClick: () => void; childre
   return (
     <button
       disabled={props.disabled}
-      onClick={props.onClick}
+      onClick={() => props.onClick()}
       style={{
         padding: '6px 10px',
         'border-radius': '4px',

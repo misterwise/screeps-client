@@ -181,7 +181,7 @@ export function CodePanel(props: { onClose: () => void }) {
         </button>
 
         <button
-          onClick={props.onClose}
+          onClick={() => props.onClose()}
           style={{
             background: 'transparent',
             border: 'none',

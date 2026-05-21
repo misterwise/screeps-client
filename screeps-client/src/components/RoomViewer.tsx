@@ -194,7 +194,7 @@ export function RoomViewer(props: RoomViewerProps) {
         !bounds || isRoomInWorld(tx, ty, bounds)
 
       const navTo = (target: string) => {
-        log(`navigate requested: ${props.room} → ${target}`)
+        log(`navigate requested: ${room} → ${target}`)
         nav(target, shard)
       }
 
@@ -274,11 +274,17 @@ export function RoomViewer(props: RoomViewerProps) {
       r.world.addChild(visualLayer.container)
       r.bringNavOverlayToTop()
 
-      // Wire up tile click → current room interaction mode
+      // Wire up tile click → current room interaction mode.
+      // setTileHandlers is registered once for the lifetime of the renderer;
+      // the click handler must read live props.room/props.shard at invocation
+      // time, so the solid/reactivity check is intentionally suppressed below.
       r.setTileHandlers(
           // hover: nothing extra needed beyond what HoverHighlightLayer does internally
           (_tx, _ty) => {},
+          // eslint-disable-next-line solid/reactivity
           (tx, ty, ctrlKey) => {
+            const currentRoom = props.room
+            const currentShard = props.shard
             const mode = roomViewMode()
 
             const overlay = overlayAction()
@@ -287,11 +293,11 @@ export function RoomViewer(props: RoomViewerProps) {
               const c = client()
               if (!c) return
 
-              const { name, room, color, secondaryColor } = overlay
-              c.http.game.removeFlag(room, name)
+              const { name, room: flagRoom, color, secondaryColor } = overlay
+              c.http.game.removeFlag(flagRoom, name)
                 .then(() => {
                   return c.http.game.createFlag(
-                    props.room, tx, ty, name, color, secondaryColor, props.shard ?? undefined
+                    currentRoom, tx, ty, name, color, secondaryColor, currentShard ?? undefined
                   )
                 })
                 .then(() => {
@@ -326,7 +332,7 @@ export function RoomViewer(props: RoomViewerProps) {
 
               const color = FLAG_COLOR_MAP[draft.color] ?? 0
               const secondaryColor = FLAG_COLOR_MAP[draft.secondaryColor] ?? 0
-              c.http.game.createFlag(props.room, tx, ty, name, color, secondaryColor, props.shard ?? undefined)
+              c.http.game.createFlag(currentRoom, tx, ty, name, color, secondaryColor, currentShard ?? undefined)
                   .then(() => {
                     addToast(`Flag "${name}" created`, 'success')
                     clearPendingTile()
@@ -355,7 +361,7 @@ export function RoomViewer(props: RoomViewerProps) {
                 }
                 const c = client()
                 if (!c) return
-                c.http.game.removeConstructionSite(props.room, sites.map(({ id }) => id), props.shard ?? undefined)
+                c.http.game.removeConstructionSite(currentRoom, sites.map(({ id }) => id), currentShard ?? undefined)
                   .then(() => {
                     addToast(`Removed ${sites.length} construction site${sites.length > 1 ? 's' : ''}`, 'success')
                     clearPendingTile()
@@ -370,7 +376,7 @@ export function RoomViewer(props: RoomViewerProps) {
 
               setPendingTile({ tx, ty })
               r.hoverLayer.setPendingTile(tx, ty)
-              confirmBuild(props.room, props.shard)
+              confirmBuild(currentRoom, currentShard)
               return
             }
 

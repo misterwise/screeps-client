@@ -188,7 +188,7 @@ export function FlagForm() {
             </select>
           </label>
 
-          <div style={{ color: '#484f58', 'font-size': '11px', 'line-height': 1.4 }}>
+          <div style={{ color: '#484f58', 'font-size': '11px', 'line-height': '1.4' }}>
             {pendingTile()
               ? `Marked at x=${pendingTile()!.tx}, y=${pendingTile()!.ty}. Click again to create the flag, or click elsewhere to move the mark.`
               : 'Click a position in the room to mark it.'}

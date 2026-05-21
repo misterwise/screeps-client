@@ -1,4 +1,5 @@
 import { For, Show, createSignal, createEffect } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { selection, deselectItem } from '~/stores/selectionStore.js'
 import { client, gameTime } from '~/stores/clientStore.js'
 import { overlayAction, setOverlayAction } from '~/stores/roomViewStore.js'
@@ -290,9 +291,10 @@ function FlagDetails(props: { item: SelectedObject }) {
 
     const c = client()
     if (!c) return
+    const id = props.item.id
     c.http.game.removeFlag(room(), name())
       .then(() => {
-        deselectItem(props.item.id)
+        deselectItem(id)
       })
       .catch(() => {})
   }
@@ -425,7 +427,7 @@ function SelectionItem(props: { item: SelectedObject }) {
   const color = () => OBJECT_COLORS[props.item.type] ?? '#c9d1d9'
   const label = () => TYPE_LABELS[props.item.type] ?? props.item.type
 
-  const DetailsRenderer = CUSTOM_DETAILS[props.item.type] || DefaultDetails
+  const detailsComponent = () => CUSTOM_DETAILS[props.item.type] || DefaultDetails
 
   return (
     <div
@@ -489,7 +491,7 @@ function SelectionItem(props: { item: SelectedObject }) {
             cursor: 'pointer',
             padding: '0 4px',
             'font-size': '14px',
-            'line-height': 1,
+            'line-height': '1',
             display: 'flex',
             'align-items': 'center',
             'justify-content': 'center'
@@ -502,7 +504,7 @@ function SelectionItem(props: { item: SelectedObject }) {
         </button>
       </div>
 
-      <DetailsRenderer item={props.item} />
+      <Dynamic component={detailsComponent()} item={props.item} />
     </div>
   )
 }

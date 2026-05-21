@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, Show } from 'solid-js'
+import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js'
 import { connect, status, error } from '~/stores/clientStore.js'
 import { isEmbedded, embeddedServerUrl } from '~/utils/embedded.js'
 import {
@@ -246,7 +246,7 @@ function RegistrationForm(props: {
 
         <button
           type="button"
-          onClick={props.onCancel}
+          onClick={() => props.onCancel()}
           style={{
             padding: '8px',
             'border-radius': '6px',
@@ -494,11 +494,13 @@ export function LoginForm() {
             Server Mods
           </div>
           <div style={{ display: 'flex', 'flex-wrap': 'wrap', gap: '6px' }}>
-            {mods().map(f => (
-              <span style={{ 'font-size': '11px', padding: '2px 8px', 'border-radius': '12px', background: '#21262d', border: '1px solid #30363d', color: '#8b949e', 'font-family': 'monospace' }}>
-                {f.name}{f.version ? ` ${f.version}` : ''}
-              </span>
-            ))}
+            <For each={mods()}>
+              {(f) => (
+                <span style={{ 'font-size': '11px', padding: '2px 8px', 'border-radius': '12px', background: '#21262d', border: '1px solid #30363d', color: '#8b949e', 'font-family': 'monospace' }}>
+                  {f.name}{f.version ? ` ${f.version}` : ''}
+                </span>
+              )}
+            </For>
           </div>
         </div>
       </Show>
