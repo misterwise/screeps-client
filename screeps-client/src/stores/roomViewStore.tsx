@@ -140,6 +140,7 @@ export function confirmBuild(room: string, shard: string | null): void {
         console.log('[build] spawn placed')
         addToast('Spawn placed successfully', 'success')
         clearPendingTile()
+        return c.stores.user.refreshWorldStatus()
       })
       .catch((err: Error) => {
         console.error('[build] place spawn failed:', err)
