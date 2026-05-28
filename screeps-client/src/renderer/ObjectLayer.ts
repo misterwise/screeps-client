@@ -1,9 +1,12 @@
-import { Container, Graphics, Text, Ticker, Sprite } from 'pixi.js'
+import { Container, Graphics, Text, Ticker, Sprite, Texture } from 'pixi.js'
 import type { RoomObject, RoomObjectMap, RoomObjectDiff, Badge } from 'screeps-connectivity'
 import { BadgeTextureCache } from './BadgeTextureCache.js'
+import type { Theme, ControllerSpec, FlagSpec, TombstoneSpec } from './themes/Theme.js'
+import type { AtlasCache } from './AtlasCache.js'
 
 const sharedBadgeCache = new BadgeTextureCache()
 import { TILE_SIZE } from './RoomRenderer.js'
+import { CONTROLLER_DOWNGRADE } from '~/utils/gameConstants.js'
 import {
   BODY_PART_COLORS,
   OBJECT_COLORS,
@@ -394,6 +397,20 @@ function drawControllerSegments(
   }
 }
 
+function updateControllerSegSprites(container: ContainerWithTarget, level: number, progress: number, progressTotal: number): void {
+  const segs = container.__ctrlSegSprites
+  if (!segs) return
+  for (let i = 0; i < segs.length; i++) {
+    if (i < level) {
+      segs[i]!.alpha = 1.0
+    } else if (i === level && progressTotal > 0) {
+      segs[i]!.alpha = Math.max(0.15, progress / progressTotal)
+    } else {
+      segs[i]!.alpha = 0.15
+    }
+  }
+}
+
 function isForeignCreep(obj: RoomObject, currentUserId?: string): boolean {
   const creepUser = obj.user
   if (typeof creepUser !== 'string') return false
@@ -408,6 +425,8 @@ function createObjectVisual(
   _badge?: Badge,
   badgeCache?: BadgeTextureCache,
   users?: Record<string, { _id: string; username: string; badge?: Badge }>,
+  theme?: Theme | null,
+  atlasCache?: AtlasCache | null,
 ): Container {
   const container = new Container()
   const g = new Graphics()
@@ -679,32 +698,77 @@ function createObjectVisual(
       const ctrlUserId = typeof obj.user === 'string' ? obj.user : undefined
       const ctrlBadge = ctrlUserId ? users?.[ctrlUserId]?.badge : undefined
 
-      // Octagon background. Lifted fill + brighter stroke so unowned controllers
-      // (no segments / no badge on top) remain visible against the dark terrain.
-      const octoG = new Graphics()
-      const octopts: number[] = []
-      for (let i = 0; i < 8; i++) {
-        const angle = -Math.PI / 2 + i * Math.PI / 4  // vertex at top
-        octopts.push(cx + CTRL_OCTO_R * Math.cos(angle), cy + CTRL_OCTO_R * Math.sin(angle))
-      }
-      octoG.poly(octopts)
-      octoG.fill(0x222831)
-      octoG.poly(octopts)
-      octoG.stroke({ width: TILE_SIZE * 0.07, color: 0x7A7E85 })
-      container.addChild(octoG)
+      const ctrlSpec: ControllerSpec | undefined = theme?.controller
+      if (ctrlSpec && atlasCache) {
+        const targetSize = TILE_SIZE * ctrlSpec.tileScale
+        const segScale = targetSize / 600
 
-      // Level / progress segments (dynamic)
-      const segG = new Graphics()
-      drawControllerSegments(segG, cx, cy, CTRL_SEG_OUT, CTRL_SEG_IN, level, progress, progressTotal)
-      container.addChild(segG)
-      ;(container as ContainerWithTarget).__ctrlSegGraphics   = segG
+        const bgSprite = new Sprite()
+        bgSprite.anchor.set(0.5, 0.5)
+        bgSprite.x = cx
+        bgSprite.y = cy
+        bgSprite.width = targetSize
+        bgSprite.height = targetSize
+        container.addChild(bgSprite)
+
+        const segSprites: Sprite[] = []
+        for (let i = 0; i < 8; i++) {
+          const seg = new Sprite()
+          seg.anchor.set(0.5, 0.5)
+          seg.x = cx
+          seg.y = cy
+          seg.scale.set(segScale)
+          seg.rotation = i * (Math.PI / 4)
+          container.addChild(seg)
+          segSprites.push(seg)
+        }
+        ;(container as ContainerWithTarget).__ctrlSegSprites = segSprites
+        updateControllerSegSprites(container as ContainerWithTarget, level, progress, progressTotal)
+
+        const loadAtlas = (): Promise<import('pixi.js').Spritesheet> => atlasCache.getOrLoad(theme!.atlasUrl)
+        const bgTex = atlasCache.getTexture(theme!.atlasUrl, ctrlSpec.backgroundFrame)
+        if (bgTex) {
+          bgSprite.texture = bgTex
+        } else {
+          loadAtlas().then(sheet => {
+            if (!bgSprite.destroyed) bgSprite.texture = sheet.textures[ctrlSpec.backgroundFrame] ?? Texture.EMPTY
+          }).catch(() => {})
+        }
+        const existingSegTex = atlasCache.getTexture(theme!.atlasUrl, ctrlSpec.segmentFrame)
+        if (existingSegTex) {
+          for (const seg of segSprites) seg.texture = existingSegTex
+        } else {
+          loadAtlas().then(sheet => {
+            const tex = sheet.textures[ctrlSpec.segmentFrame] ?? Texture.EMPTY
+            for (const seg of segSprites) { if (!seg.destroyed) seg.texture = tex }
+          }).catch(() => {})
+        }
+      } else {
+        // Graphics fallback: octagon + arc segments
+        const octoG = new Graphics()
+        const octopts: number[] = []
+        for (let i = 0; i < 8; i++) {
+          const angle = -Math.PI / 2 + i * Math.PI / 4
+          octopts.push(cx + CTRL_OCTO_R * Math.cos(angle), cy + CTRL_OCTO_R * Math.sin(angle))
+        }
+        octoG.poly(octopts)
+        octoG.fill(0x222831)
+        octoG.poly(octopts)
+        octoG.stroke({ width: TILE_SIZE * 0.07, color: 0x7A7E85 })
+        container.addChild(octoG)
+
+        const segG = new Graphics()
+        drawControllerSegments(segG, cx, cy, CTRL_SEG_OUT, CTRL_SEG_IN, level, progress, progressTotal)
+        container.addChild(segG)
+        ;(container as ContainerWithTarget).__ctrlSegGraphics = segG
+      }
+
       ;(container as ContainerWithTarget).__ctrlLevel         = level
       ;(container as ContainerWithTarget).__ctrlProgress      = progress
       ;(container as ContainerWithTarget).__ctrlProgressTotal = progressTotal
+      ;(container as ContainerWithTarget).__ctrlDowngradeTime = typeof obj.downgradeTime === 'number' ? obj.downgradeTime : undefined
 
-      // Inner circle — backdrop behind badge (owned) or neutral disc + center
-      // dot (unowned). Unowned gets a brighter fill and a small dot so it reads
-      // as a controller rather than a vague dark blob.
+      // Inner circle — backdrop behind badge (owned) or neutral disc + center dot (unowned)
       const innerCircleG = new Graphics()
       if (ctrlBadge) {
         innerCircleG.circle(cx, cy, CTRL_SEG_IN)
@@ -719,14 +783,12 @@ function createObjectVisual(
       }
       container.addChild(innerCircleG)
 
-      // Owner badge — circular, fills inner area
       if (ctrlBadge && badgeCache) {
         const bs = new Sprite()
         bs.anchor.set(0.5, 0.5)
         bs.width  = CTRL_SEG_IN * 2
         bs.height = CTRL_SEG_IN * 2
         bs.position.set(cx, cy)
-        // Circular mask so the badge is round, not square
         const bsMask = new Graphics()
         bsMask.circle(cx, cy, CTRL_SEG_IN)
         bsMask.fill(0xffffff)
@@ -804,6 +866,39 @@ function createObjectVisual(
       break
     }
     case 'storage': {
+      const spec = theme?.sprites['storage']
+      if (spec && atlasCache) {
+        const { used: storageUsed, capacity: storageCap } = getStoreFill(obj)
+        const targetSize = TILE_SIZE * spec.tileScale
+        const applyTexture = (sprite: Sprite, tex: Texture) => {
+          sprite.texture = tex
+          sprite.width = targetSize
+          sprite.height = targetSize
+        }
+        for (const layer of spec.layers) {
+          const sprite = new Sprite()
+          sprite.anchor.set(0.5, 0.5)
+          sprite.x = cx
+          sprite.y = cy
+          if (layer.tint === 'owner') sprite.tint = outlineColor
+          container.addChild(sprite)
+          const tex = atlasCache.getTexture(theme!.atlasUrl, layer.frame)
+          if (tex) {
+            applyTexture(sprite, tex)
+          } else {
+            atlasCache.getOrLoad(theme!.atlasUrl).then(sheet => {
+              if (!sprite.destroyed) applyTexture(sprite, sheet.textures[layer.frame] ?? Texture.EMPTY)
+            }).catch(() => {})
+          }
+        }
+        const storageFillG = new Graphics()
+        container.addChild(storageFillG)
+        ;(container as ContainerWithTarget).__storageFillG = storageFillG
+        ;(container as ContainerWithTarget).__storageUsed = storageUsed
+        ;(container as ContainerWithTarget).__storageCapacity = storageCap
+        updateStorageFill(container as ContainerWithTarget, calcStorageFillHeight(storageUsed, storageCap))
+        break
+      }
       const { used: storageUsed, capacity: storageCap } = getStoreFill(obj)
       const storagePts = spts(cx, cy, [
         [-0.6, -0.7], [0, -0.8], [0.6, -0.7], [0.65, 0],
@@ -925,38 +1020,83 @@ function createObjectVisual(
       const secColorIdx = typeof obj.secondaryColor === 'number' ? obj.secondaryColor : 0
       const flagColor = FLAG_COLORS[colorIdx] ?? FLAG_COLORS[0]
       const secColor = FLAG_COLORS[secColorIdx] ?? FLAG_COLORS[0]
-      const S = 1.5
 
-      // Flag pole — centered in tile, 50% bigger
-      const poleW = TILE_SIZE * 0.08 * S
-      const poleH = TILE_SIZE * 0.7 * S
-      const poleX = cx - poleW / 2
-      const poleY = cy - TILE_SIZE * 0.25 * S
-      g.rect(poleX, poleY, poleW, poleH)
-      g.fill(0x888888)
+      const flagSpec: FlagSpec | undefined = theme?.flag
+      if (flagSpec && atlasCache) {
+        const targetSize = TILE_SIZE * flagSpec.tileScale
+        const loadAtlas = (): Promise<import('pixi.js').Spritesheet> => atlasCache.getOrLoad(theme!.atlasUrl)
+        const applyTex = (sprite: Sprite, tex: Texture) => {
+          sprite.texture = tex
+          sprite.width = targetSize
+          sprite.height = targetSize
+        }
 
-      // One flag triangle split into upper (primary) and lower (secondary) halves
-      const attachX = poleX + poleW
-      const attachY = poleY
-      const tipX = attachX + TILE_SIZE * 0.45 * S
-      const topY = attachY
-      const bottomY = attachY + TILE_SIZE * 0.44 * S
-      const tipY = (topY + bottomY) / 2
-      const splitY = tipY
+        const mainSprite = new Sprite()
+        mainSprite.anchor.set(0.5, 0.5)
+        mainSprite.x = cx
+        mainSprite.y = cy
+        mainSprite.tint = flagColor
+        container.addChild(mainSprite)
 
-      g.moveTo(attachX, topY)
-      g.lineTo(tipX, tipY)
-      g.lineTo(attachX, splitY)
-      g.closePath()
-      g.fill(flagColor)
+        const mainTex = atlasCache.getTexture(theme!.atlasUrl, flagSpec.mainFrame)
+        if (mainTex) {
+          applyTex(mainSprite, mainTex)
+        } else {
+          loadAtlas().then(sheet => {
+            if (!mainSprite.destroyed) applyTex(mainSprite, sheet.textures[flagSpec.mainFrame] ?? Texture.EMPTY)
+          }).catch(() => {})
+        }
 
-      g.moveTo(attachX, splitY)
-      g.lineTo(tipX, tipY)
-      g.lineTo(attachX, bottomY)
-      g.closePath()
-      g.fill(secColor)
+        if (secColorIdx !== colorIdx) {
+          const secondSprite = new Sprite()
+          secondSprite.anchor.set(0.5, 0.5)
+          secondSprite.x = cx
+          secondSprite.y = cy
+          secondSprite.tint = secColor
+          container.addChild(secondSprite)
 
-      container.addChild(g)
+          const secondTex = atlasCache.getTexture(theme!.atlasUrl, flagSpec.secondFrame)
+          if (secondTex) {
+            applyTex(secondSprite, secondTex)
+          } else {
+            loadAtlas().then(sheet => {
+              if (!secondSprite.destroyed) applyTex(secondSprite, sheet.textures[flagSpec.secondFrame] ?? Texture.EMPTY)
+            }).catch(() => {})
+          }
+        }
+      } else {
+        // Graphics fallback
+        const S = 1.5
+        const poleW = TILE_SIZE * 0.08 * S
+        const poleH = TILE_SIZE * 0.7 * S
+        const poleX = cx - poleW / 2
+        const poleY = cy - TILE_SIZE * 0.25 * S
+        g.rect(poleX, poleY, poleW, poleH)
+        g.fill(0x888888)
+
+        const attachX = poleX + poleW
+        const attachY = poleY
+        const tipX = attachX + TILE_SIZE * 0.45 * S
+        const topY = attachY
+        const bottomY = attachY + TILE_SIZE * 0.44 * S
+        const tipY = (topY + bottomY) / 2
+        const splitY = tipY
+
+        g.moveTo(attachX, topY)
+        g.lineTo(tipX, tipY)
+        g.lineTo(attachX, splitY)
+        g.closePath()
+        g.fill(flagColor)
+
+        g.moveTo(attachX, splitY)
+        g.lineTo(tipX, tipY)
+        g.lineTo(attachX, bottomY)
+        g.closePath()
+        g.fill(secColor)
+
+        container.addChild(g)
+      }
+
       ;(container as ContainerWithTarget).__flagColor = colorIdx
       ;(container as ContainerWithTarget).__flagSecondaryColor = secColorIdx
 
@@ -1014,37 +1154,77 @@ function createObjectVisual(
       const isMine = tsUser !== undefined && tsUser === currentUserId
       const tsColor = isMine ? CS_OWN : OBJ_FOREIGN
 
-      // Tombstone silhouette: rectangle body with a half-circle dome on top
-      const w = TILE_SIZE * 0.62
-      const h = TILE_SIZE * 0.82
-      const x0 = cx - w / 2
-      const y0 = cy - h / 2
-      const r = w / 2
+      const tsSpec: TombstoneSpec | undefined = theme?.tombstone
+      if (tsSpec && atlasCache) {
+        const targetSize = TILE_SIZE * tsSpec.tileScale
+        const loadAtlas = (): Promise<import('pixi.js').Spritesheet> => atlasCache.getOrLoad(theme!.atlasUrl)
 
-      const tg = new Graphics()
-      tg.moveTo(x0, y0 + r)
-      tg.arc(cx, y0 + r, r, Math.PI, 0, false)
-      tg.lineTo(x0 + w, y0 + h)
-      tg.lineTo(x0, y0 + h)
-      tg.closePath()
-      tg.fill(ST_DARK)
-      tg.moveTo(x0, y0 + r)
-      tg.arc(cx, y0 + r, r, Math.PI, 0, false)
-      tg.lineTo(x0 + w, y0 + h)
-      tg.lineTo(x0, y0 + h)
-      tg.closePath()
-      tg.stroke({ width: TILE_SIZE * 0.07, color: tsColor, alpha: 0.9 })
-      container.addChild(tg)
+        const shellSprite = new Sprite()
+        shellSprite.anchor.set(0.5, 0.5)
+        shellSprite.x = cx
+        shellSprite.y = cy
+        shellSprite.width = targetSize
+        shellSprite.height = targetSize
+        container.addChild(shellSprite)
 
-      // X mark — cause-of-death glyph in owner color
-      const xR = TILE_SIZE * 0.18
-      const xMark = new Graphics()
-      xMark.moveTo(cx - xR, cy - xR * 0.6)
-      xMark.lineTo(cx + xR, cy + xR * 0.6)
-      xMark.moveTo(cx + xR, cy - xR * 0.6)
-      xMark.lineTo(cx - xR, cy + xR * 0.6)
-      xMark.stroke({ width: TILE_SIZE * 0.09, color: tsColor, cap: 'round' })
-      container.addChild(xMark)
+        const crossSprite = new Sprite()
+        crossSprite.anchor.set(0.5, 0.5)
+        crossSprite.x = cx
+        crossSprite.y = cy
+        crossSprite.width = targetSize
+        crossSprite.height = targetSize
+        crossSprite.tint = tsColor
+        container.addChild(crossSprite)
+
+        const shellTex = atlasCache.getTexture(theme!.atlasUrl, tsSpec.shellFrame)
+        if (shellTex) {
+          shellSprite.texture = shellTex
+        } else {
+          loadAtlas().then(sheet => {
+            if (!shellSprite.destroyed) shellSprite.texture = sheet.textures[tsSpec.shellFrame] ?? Texture.EMPTY
+          }).catch(() => {})
+        }
+
+        const crossTex = atlasCache.getTexture(theme!.atlasUrl, tsSpec.crossFrame)
+        if (crossTex) {
+          crossSprite.texture = crossTex
+        } else {
+          loadAtlas().then(sheet => {
+            if (!crossSprite.destroyed) crossSprite.texture = sheet.textures[tsSpec.crossFrame] ?? Texture.EMPTY
+          }).catch(() => {})
+        }
+      } else {
+        // Graphics fallback
+        const w = TILE_SIZE * 0.62
+        const h = TILE_SIZE * 0.82
+        const x0 = cx - w / 2
+        const y0 = cy - h / 2
+        const r = w / 2
+
+        const tg = new Graphics()
+        tg.moveTo(x0, y0 + r)
+        tg.arc(cx, y0 + r, r, Math.PI, 0, false)
+        tg.lineTo(x0 + w, y0 + h)
+        tg.lineTo(x0, y0 + h)
+        tg.closePath()
+        tg.fill(ST_DARK)
+        tg.moveTo(x0, y0 + r)
+        tg.arc(cx, y0 + r, r, Math.PI, 0, false)
+        tg.lineTo(x0 + w, y0 + h)
+        tg.lineTo(x0, y0 + h)
+        tg.closePath()
+        tg.stroke({ width: TILE_SIZE * 0.07, color: tsColor, alpha: 0.9 })
+        container.addChild(tg)
+
+        const xR = TILE_SIZE * 0.18
+        const xMark = new Graphics()
+        xMark.moveTo(cx - xR, cy - xR * 0.6)
+        xMark.lineTo(cx + xR, cy + xR * 0.6)
+        xMark.moveTo(cx + xR, cy - xR * 0.6)
+        xMark.lineTo(cx - xR, cy + xR * 0.6)
+        xMark.stroke({ width: TILE_SIZE * 0.09, color: tsColor, cap: 'round' })
+        container.addChild(xMark)
+      }
       break
     }
     default: {
@@ -1085,8 +1265,14 @@ function createObjectVisual(
     container.addChild(label)
   }
 
-  if (obj.type === 'creep') container.zIndex = 1
-  if (obj.type === 'flag') container.zIndex = 10
+  // Tier-based zIndex: structures=0, creeps=100, flags=200
+  // Each spec can add an offset within its tier via zIndex field
+  const baseZ = obj.type === 'creep' ? 100 : obj.type === 'flag' ? 200 : 0
+  const specZ = obj.type === 'flag' ? (theme?.flag?.zIndex ?? 0)
+    : obj.type === 'controller' ? (theme?.controller?.zIndex ?? 0)
+    : obj.type === 'tombstone' ? (theme?.tombstone?.zIndex ?? 0)
+    : (theme?.sprites[obj.type]?.zIndex ?? 0)
+  container.zIndex = baseZ + specZ
 
   container.position.set(obj.x * TILE_SIZE, obj.y * TILE_SIZE)
   return container
@@ -1120,9 +1306,11 @@ type ContainerWithTarget = Container & {
   __storageCapacity?: number
   __barrelContainer?: Container
   __ctrlSegGraphics?: Graphics
+  __ctrlSegSprites?: Sprite[]
   __ctrlLevel?: number
   __ctrlProgress?: number
   __ctrlProgressTotal?: number
+  __ctrlDowngradeTime?: number
   __flagColor?: number
   __flagSecondaryColor?: number
   __sourceGraphics?: Graphics
@@ -1214,6 +1402,8 @@ export class ObjectLayer {
   private storageFillAnimations = new Map<string, ExtAnimation>()
   private sourceAnimations = new Map<string, ExtAnimation>()
   private buildGlowAnimations = new Map<string, { startTime: number; duration: number }>()
+  private ctrlFlashAnimations = new Map<string, { segIndex: number; startTime: number; duration: number }>()
+  private currentGameTime = 0
   private sayBubbles = new Set<string>()
   private moveDuration = 600
   private readonly EXT_ANIM_DURATION = 300
@@ -1224,6 +1414,8 @@ export class ObjectLayer {
   private badge?: Badge
   private readonly badgeCache = sharedBadgeCache
   private users?: Record<string, { _id: string; username: string; badge?: Badge }>
+  private activeTheme: Theme | null = null
+  private atlasCache: AtlasCache | null = null
 
   constructor(ticker?: Ticker, showLabels = true, currentUserId?: string, badge?: Badge, users?: Record<string, { _id: string; username: string; badge?: Badge }>) {
     this.showLabels = showLabels
@@ -1242,6 +1434,11 @@ export class ObjectLayer {
       this.tickerCallback = () => this.tick()
       ticker.add(this.tickerCallback)
     }
+  }
+
+  setTheme(theme: Theme | null, cache: AtlasCache | null): void {
+    this.activeTheme = theme
+    this.atlasCache = cache
   }
 
   private tick(): void {
@@ -1368,6 +1565,66 @@ export class ObjectLayer {
       }
       if (t >= 1) this.buildGlowAnimations.delete(id)
     }
+
+    // Controller segment flash: the next (not-yet-earned) segment briefly lights up
+    // when progress increases, then fades back to its dim base alpha (0.15).
+    for (const [id, anim] of this.ctrlFlashAnimations) {
+      const visual = this.objects.get(id)
+      const segs = visual?.__ctrlSegSprites
+      if (!visual || !segs) {
+        this.ctrlFlashAnimations.delete(id)
+        continue
+      }
+      const t = Math.min(1, (now - anim.startTime) / anim.duration)
+      const ease = 1 - (1 - t) * (1 - t)  // ease-out: peaks immediately, fades back
+      const seg = segs[anim.segIndex]
+      if (seg && !seg.destroyed) {
+        seg.alpha = 1.0 - (1.0 - 0.15) * ease
+      }
+      if (t >= 1) {
+        if (seg && !seg.destroyed) seg.alpha = 0.15
+        this.ctrlFlashAnimations.delete(id)
+      }
+    }
+
+    // Controller downgrade warning: earned segments (0..level-1) tint pink→red as downgrade approaches
+    for (const visual of this.objects.values()) {
+      const level = visual.__ctrlLevel
+      const segs = visual.__ctrlSegSprites
+      if (!level || !segs) continue
+
+      const dt = visual.__ctrlDowngradeTime
+      if (!dt) {
+        for (let i = 0; i < level; i++) {
+          const seg = segs[i]
+          if (seg && !seg.destroyed) seg.tint = 0xffffff
+        }
+        continue
+      }
+
+      const maxTicks = CONTROLLER_DOWNGRADE[level] ?? 20000
+      const remaining = Math.max(0, dt - this.currentGameTime)
+      const urgency = 1 - remaining / maxTicks
+
+      if (urgency <= 0.2) {
+        for (let i = 0; i < level; i++) {
+          const seg = segs[i]
+          if (seg && !seg.destroyed) seg.tint = 0xffffff
+        }
+        continue
+      }
+
+      const danger = (urgency - 0.2) / 0.8
+      const pulseHz = 0.3 + danger * 1.5
+      const pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * pulseHz * now / 1000)
+      const peakColor = lerpColor(0xffdddd, 0xff2222, danger)
+      const tintColor = lerpColor(0xffffff, peakColor, danger * pulse)
+
+      for (let i = 0; i < level; i++) {
+        const seg = segs[i]
+        if (seg && !seg.destroyed) seg.tint = tintColor
+      }
+    }
   }
 
   private startExtAnimation(
@@ -1460,9 +1717,12 @@ export class ObjectLayer {
     this.sourceAnimations.set(id, { visual, fromRadius: fromSize, toRadius: toSize, startTime: performance.now() })
   }
 
-  update(objects: RoomObjectMap, diff?: RoomObjectDiff, users?: Record<string, { _id: string; username: string; badge?: Badge }>): void {
+  update(objects: RoomObjectMap, diff?: RoomObjectDiff, users?: Record<string, { _id: string; username: string; badge?: Badge }>, gameTime?: number): void {
     if (users) {
       this.users = users
+    }
+    if (gameTime !== undefined) {
+      this.currentGameTime = gameTime
     }
     let roadsChanged = false
 
@@ -1486,6 +1746,7 @@ export class ObjectLayer {
             this.storageFillAnimations.delete(id)
             this.sourceAnimations.delete(id)
             this.buildGlowAnimations.delete(id)
+            this.ctrlFlashAnimations.delete(id)
             this.sayBubbles.delete(id)
           }
         } else {
@@ -1502,7 +1763,7 @@ export class ObjectLayer {
           this.rawObjects.set(id, obj)
           const existing = this.objects.get(id)
           if (!existing) {
-            const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users)
+            const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users, this.activeTheme, this.atlasCache)
             visual.__tileX = obj.x
             visual.__tileY = obj.y
             this.applyLabelScale(visual)
@@ -1552,7 +1813,7 @@ export class ObjectLayer {
                 this.container.removeChild(existing)
                 destroyVisual(existing)
                 this.objects.delete(id)
-                const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users)
+                const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users, this.activeTheme, this.atlasCache)
                 visual.__tileX = obj.x
                 visual.__tileY = obj.y
                 this.applyLabelScale(visual)
@@ -1602,13 +1863,20 @@ export class ObjectLayer {
               const progress      = typeof obj.progress      === 'number' ? obj.progress      : 0
               const progressTotal = typeof obj.progressTotal === 'number' ? obj.progressTotal : 0
               if (existing.__ctrlLevel !== level || existing.__ctrlProgress !== progress || existing.__ctrlProgressTotal !== progressTotal) {
-                if (existing.__ctrlSegGraphics) {
+                if (existing.__ctrlSegSprites) {
+                  if (!this.instantMode && level < 8 && progress > (existing.__ctrlProgress ?? 0)) {
+                    this.ctrlFlashAnimations.set(id, { segIndex: level, startTime: performance.now(), duration: 400 })
+                  }
+                  updateControllerSegSprites(existing, level, progress, progressTotal)
+                } else if (existing.__ctrlSegGraphics) {
                   drawControllerSegments(existing.__ctrlSegGraphics, TILE_SIZE / 2, TILE_SIZE / 2, CTRL_SEG_OUT, CTRL_SEG_IN, level, progress, progressTotal)
                 }
                 existing.__ctrlLevel         = level
                 existing.__ctrlProgress      = progress
                 existing.__ctrlProgressTotal = progressTotal
               }
+              const newDt = typeof obj.downgradeTime === 'number' ? obj.downgradeTime : undefined
+              if (existing.__ctrlDowngradeTime !== newDt) existing.__ctrlDowngradeTime = newDt
             }
             if (obj.type === 'source') {
               const { energy, capacity } = getSourceEnergy(obj)
@@ -1644,7 +1912,7 @@ export class ObjectLayer {
         this.rawObjects.set(id, obj)
         const existing = this.objects.get(id)
         if (!existing) {
-          const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users)
+          const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users, this.activeTheme, this.atlasCache)
           visual.__tileX = obj.x
           visual.__tileY = obj.y
           this.applyLabelScale(visual)
@@ -1694,7 +1962,7 @@ export class ObjectLayer {
               this.container.removeChild(existing)
               destroyVisual(existing)
               this.objects.delete(id)
-              const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users)
+              const visual: ContainerWithTarget = createObjectVisual(obj, this.showLabels, this.currentUserId, this.badge, this.badgeCache, this.users, this.activeTheme, this.atlasCache)
               visual.__tileX = obj.x
               visual.__tileY = obj.y
               this.applyLabelScale(visual)
@@ -1736,13 +2004,20 @@ export class ObjectLayer {
             const progress      = typeof obj.progress      === 'number' ? obj.progress      : 0
             const progressTotal = typeof obj.progressTotal === 'number' ? obj.progressTotal : 0
             if (existing.__ctrlLevel !== level || existing.__ctrlProgress !== progress || existing.__ctrlProgressTotal !== progressTotal) {
-              if (existing.__ctrlSegGraphics) {
+              if (existing.__ctrlSegSprites) {
+                if (!this.instantMode && level > (existing.__ctrlLevel ?? 0) && level > 0) {
+                  this.ctrlFlashAnimations.set(id, { segIndex: level - 1, startTime: performance.now(), duration: 500 })
+                }
+                updateControllerSegSprites(existing, level, progress, progressTotal)
+              } else if (existing.__ctrlSegGraphics) {
                 drawControllerSegments(existing.__ctrlSegGraphics, TILE_SIZE / 2, TILE_SIZE / 2, CTRL_SEG_OUT, CTRL_SEG_IN, level, progress, progressTotal)
               }
               existing.__ctrlLevel         = level
               existing.__ctrlProgress      = progress
               existing.__ctrlProgressTotal = progressTotal
             }
+            const newDt = typeof obj.downgradeTime === 'number' ? obj.downgradeTime : undefined
+            if (existing.__ctrlDowngradeTime !== newDt) existing.__ctrlDowngradeTime = newDt
           }
           if (obj.type === 'source') {
             const { energy, capacity } = getSourceEnergy(obj)
@@ -1778,6 +2053,7 @@ export class ObjectLayer {
           this.towerFillAnimations.delete(id)
           this.sourceAnimations.delete(id)
           this.buildGlowAnimations.delete(id)
+          this.ctrlFlashAnimations.delete(id)
           this.sayBubbles.delete(id)
         }
       }
@@ -2176,6 +2452,7 @@ export class ObjectLayer {
     for (const anim of this.sourceAnimations.values()) updateSourceVisual(anim.visual, anim.toRadius)
     this.sourceAnimations.clear()
     this.buildGlowAnimations.clear()
+    this.ctrlFlashAnimations.clear()
   }
 
   setShowLabels(show: boolean): void {
@@ -2201,6 +2478,7 @@ export class ObjectLayer {
     this.towerFillAnimations.clear()
     this.sourceAnimations.clear()
     this.buildGlowAnimations.clear()
+    this.ctrlFlashAnimations.clear()
     this.sayBubbles.clear()
     this.roadGraphics.clear()
     this.rampartGraphics.clear()
