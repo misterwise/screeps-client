@@ -539,7 +539,7 @@ function ControllerDetails(props: { item: SelectedObject }) {
   const safeModeAvailable = () => typeof raw().safeModeAvailable === 'number' ? (raw().safeModeAvailable as number) : 0
   const safeMode = () => typeof raw().safeMode === 'number' ? (raw().safeMode as number) : null
   const isPowerEnabled = () => raw().isPowerEnabled === true
-  const reservation = () => raw().reservation as { username: string; ticksToEnd: number } | undefined
+  const reservation = () => raw().reservation as { user: string; endTime: number } | undefined
   const userId = () => typeof raw().user === 'string' ? (raw().user as string) : null
 
   const ownerName = () => {
@@ -547,6 +547,7 @@ function ControllerDetails(props: { item: SelectedObject }) {
     if (!uid) return null
     return roomOwner()?.username ?? uid
   }
+
 
   const ticksRemaining = () => {
     const dt = downgradeTime()
@@ -596,12 +597,16 @@ function ControllerDetails(props: { item: SelectedObject }) {
         <div style={kvCell()}>{ownerName() ?? 'None'}</div>
 
         <Show when={reservation()}>
-          {(res) => (
-            <>
-              <div style={kvCell(true)}>Reserved</div>
-              <div style={kvCell()}>{res().username} ({res().ticksToEnd})</div>
-            </>
-          )}
+          <>
+            <div style={kvCell(true)}>Reserved by</div>
+            <div style={kvCell()}>
+              {roomUsers()?.[reservation()!.user]?.username ?? reservation()!.user}
+            </div>
+            <div style={kvCell(true)}>Reservation</div>
+            <div style={{ ...kvCell(), 'font-variant-numeric': 'tabular-nums' }}>
+              {gameTime() !== null ? Math.max(0, reservation()!.endTime - gameTime()!) : reservation()!.endTime} ticks
+            </div>
+          </>
         </Show>
 
         <Show when={level() > 0}>
@@ -819,6 +824,88 @@ function StoreStructureDetails(props: { item: SelectedObject }) {
   )
 }
 
+function RuinDetails(props: { item: SelectedObject }) {
+  const raw = () => props.item.raw as Record<string, unknown>
+
+  const decayCountdown = () => {
+    const dt = raw().decayTime
+    if (typeof dt !== 'number') return null
+    const gt = gameTime()
+    return gt !== null ? Math.max(0, dt - gt) : dt
+  }
+
+  const userId = () => typeof raw().user === 'string' ? (raw().user as string) : null
+  const ownerName = () => {
+    const uid = userId()
+    if (!uid) return null
+    return roomUsers()?.[uid]?.username ?? uid
+  }
+
+  const structure = () => raw().structure as Record<string, unknown> | undefined
+  const structureType = () => typeof structure()?.type === 'string' ? (structure()!.type as string) : null
+  const structureHits = () => typeof structure()?.hits === 'number' ? (structure()!.hits as number) : null
+  const structureHitsMax = () => typeof structure()?.hitsMax === 'number' ? (structure()!.hitsMax as number) : null
+  const structureLevel = () => typeof structure()?.level === 'number' ? (structure()!.level as number) : null
+  const structureEnergy = () => typeof structure()?.energy === 'number' ? (structure()!.energy as number) : null
+  const structureEnergyCapacity = () => typeof structure()?.energyCapacity === 'number' ? (structure()!.energyCapacity as number) : null
+
+  const store = () => raw().store as Record<string, number> | undefined
+  const storeCapacity = () => typeof raw().storeCapacity === 'number' ? (raw().storeCapacity as number) : null
+
+  return (
+    <div>
+      <div style={kvGrid}>
+        <Show when={decayCountdown() !== null}>
+          <>
+            <div style={kvCell(true)}>Decay in</div>
+            <div style={{ ...kvCell(), 'font-variant-numeric': 'tabular-nums' }}>{decayCountdown()}</div>
+          </>
+        </Show>
+        <Show when={ownerName()}>
+          <>
+            <div style={kvCell(true)}>Owner</div>
+            <div style={kvCell()}>{ownerName()}</div>
+          </>
+        </Show>
+      </div>
+
+      <Show when={structureType()}>
+        <div style={{ background: '#21262d', 'border-top': '1px solid #30363d', 'font-size': '10px' }}>
+          <div style={{ padding: '4px 8px', background: '#161b22', color: '#8b949e', 'font-weight': 600 }}>
+            Was: {structureType()}
+          </div>
+          <div style={kvGrid}>
+            <Show when={structureHitsMax() !== null}>
+              <>
+                <div style={kvCell(true)}>Hits</div>
+                <div style={{ ...kvCell(), 'font-variant-numeric': 'tabular-nums' }}>
+                  {structureHits() ?? 0} / {structureHitsMax()}
+                </div>
+              </>
+            </Show>
+            <Show when={structureLevel() !== null}>
+              <>
+                <div style={kvCell(true)}>Level</div>
+                <div style={{ ...kvCell(), 'font-variant-numeric': 'tabular-nums' }}>{structureLevel()}</div>
+              </>
+            </Show>
+            <Show when={structureEnergyCapacity() !== null}>
+              <>
+                <div style={kvCell(true)}>Energy cap</div>
+                <div style={{ ...kvCell(), 'font-variant-numeric': 'tabular-nums' }}>
+                  {structureEnergy() ?? 0} / {structureEnergyCapacity()}
+                </div>
+              </>
+            </Show>
+          </div>
+        </div>
+      </Show>
+
+      <StoreDetails store={store()} capacity={storeCapacity()} />
+    </div>
+  )
+}
+
 import { JSX } from 'solid-js'
 const CUSTOM_DETAILS: Record<string, (props: { item: SelectedObject }) => JSX.Element> = {
   creep: CreepDetails,
@@ -833,6 +920,7 @@ const CUSTOM_DETAILS: Record<string, (props: { item: SelectedObject }) => JSX.El
   factory: StoreStructureDetails,
   nuker: StoreStructureDetails,
   powerSpawn: StoreStructureDetails,
+  ruin: RuinDetails,
 }
 
 function SelectionItem(props: { item: SelectedObject }) {
