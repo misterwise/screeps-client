@@ -700,6 +700,7 @@ export function RoomViewer(props: RoomViewerProps) {
     const moveDuration = Math.round(tickMs * 0.9)  // creep motion — fills most of a tick
 
     objLayer.setMoveDuration(moveDuration)
+    objLayer.setTickDuration(tickMs)
     lastRawState = { objects: objs, users }
     objLayer.update(objs, effectiveDiff, users, gameTime() ?? undefined)
     objLayer.setShowLabels(untrack(showCreepLabels))
@@ -732,6 +733,20 @@ export function RoomViewer(props: RoomViewerProps) {
           // receiving link gets no entry, so this fires exactly once per transfer.
           const linkTransfer = actionLog.transferEnergy as { x: number; y: number } | null | undefined
           if (linkTransfer) animLayer.addLinkTransfer(obj.x, obj.y, linkTransfer.x, linkTransfer.y, beamDuration)
+          continue
+        }
+
+        if (obj.type === 'lab') {
+          // The producing lab logs both input-lab positions as {x1,y1,x2,y2}; fire one beam
+          // per input so both streams converge on this (the output) lab. reverseReaction is
+          // the same shape for the unreaction. Only the producing lab carries the entry, so
+          // each reaction animates exactly once.
+          const reaction = (actionLog.runReaction ?? actionLog.reverseReaction) as
+            { x1: number; y1: number; x2: number; y2: number } | null | undefined
+          if (reaction) {
+            animLayer.addLabReaction(reaction.x1, reaction.y1, obj.x, obj.y, beamDuration)
+            animLayer.addLabReaction(reaction.x2, reaction.y2, obj.x, obj.y, beamDuration)
+          }
           continue
         }
 
