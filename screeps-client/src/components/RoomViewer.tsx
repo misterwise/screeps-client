@@ -700,6 +700,7 @@ export function RoomViewer(props: RoomViewerProps) {
     const moveDuration = Math.round(tickMs * 0.9)  // creep motion — fills most of a tick
 
     objLayer.setMoveDuration(moveDuration)
+    objLayer.setTickDuration(tickMs)
     lastRawState = { objects: objs, users }
     objLayer.update(objs, effectiveDiff, users, gameTime() ?? undefined)
     objLayer.setShowLabels(untrack(showCreepLabels))
