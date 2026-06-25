@@ -128,12 +128,10 @@ export const CREEP_RING_DARK = BG_MEDIUM
 export const CREEP_NOTCH     = 0xd0d0d0
 
 // ── Invader (NPC) creeps ───────────────────────────────────────────────────
-// Vanilla invaders render as an angular red diamond, distinct from the circular
-// player body. Clean-room hues approximating the in-game look, tuned by eye.
-export const INVADER_BODY = 0x4a1414  // dark blood-red diamond shell
-export const INVADER_RIM  = 0xd64545  // brighter red rim stroke
-export const INVADER_CORE = 0xf85149  // glowing red inner diamond
-export const INVADER_GLOW = 0xf85149  // soft red bloom behind the body
+export const INVADER_BODY = 0x4a1414  // diamond shell
+export const INVADER_RIM  = 0xd64545  // rim stroke
+export const INVADER_CORE = 0xf85149  // inner core
+export const INVADER_GLOW = 0xf85149  // bloom
 
 // ── Screeps canonical structure palette ────────────────────────────────────
 export const ST_DARK           = 0x181818  // structure dark background
