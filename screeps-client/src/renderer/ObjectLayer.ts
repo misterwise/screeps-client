@@ -404,7 +404,7 @@ const TOWER_BODY_H = TILE_SIZE * 0.6
 
 const TOWER_IDLE_SPEED = 0.4   // rad/s idle barrel sweep
 const TOWER_AIM_LERP   = 0.3   // per-frame fraction of remaining angle when turning to a target
-const EXTRACTOR_RING_SPEED = Math.PI / 6  // rad/s — one full turn every 12s
+const EXTRACTOR_RING_SPEED = Math.PI / 2  // rad/s — one full turn every 4s (matches vanilla)
 // Barrel art points "up" (−y) at rotation 0, so a target at screen angle θ needs
 // rotation θ + π/2. Flip the sign / drop the offset if the body sprite faces elsewhere.
 const TOWER_BARREL_FORWARD = Math.PI / 2
@@ -760,6 +760,10 @@ function factoryGearPoints(): number[] {
 }
 const FACT_GEAR_PTS = factoryGearPoints()
 
+// True while a structure is on cooldown — factory producing, extractor recharging.
+function onCooldown(obj: RoomObject): boolean {
+  return typeof obj.cooldown === 'number' && obj.cooldown > 0
+}
 function drawFactoryGear(g: Graphics, strokeColor: number): void {
   g.clear()
   g.poly(FACT_GEAR_PTS)
@@ -1731,15 +1735,18 @@ function createObjectVisual(
       break
     }
     case 'extractor': {
-      // Continuously rotating ring (rendered above the mineral) — three gapped arc
-      // segments drawn procedurally (one extractor per room, so no atlas needed).
-      // Tinted tri-state by room ownership: owner green when ours, hostile red when
-      // foreign-owned, neutral grey when the room is unowned (extractor has no owner).
+      // Ring rendered above the mineral — three gapped arc segments drawn procedurally
+      // (one extractor per room, so no atlas needed). It rotates only while the extractor
+      // is on cooldown (the ticks after a harvest), matching vanilla. Tinted tri-state by
+      // room ownership: owner green when ours, hostile red when foreign-owned, neutral
+      // grey when the room is unowned (extractor has no owner).
       const ring = new Graphics()
       ring.position.set(cx, cy)
       drawExtractorRing(ring, ownedByUser === undefined ? OBJ_GREY : outlineColor)
       container.addChild(ring)
-      ;(container as ContainerWithTarget).__extractorRing = ring
+      const extVisual = container as ContainerWithTarget
+      extVisual.__extractorRing = ring
+      extVisual.__extractorActive = onCooldown(obj)
       break
     }
     case 'invaderCore': {
@@ -2086,7 +2093,10 @@ type ContainerWithTarget = Container & {
   __towerAimAngle?: number   // target rotation while an action is active
   __towerAimUntil?: number   // performance.now() timestamp when the aim hold ends
   __towerIdlePhase?: number  // phase offset so idle sweep resumes seamlessly after aiming
-  __extractorRing?: Container  // continuously rotating mineral-extractor ring
+  __extractorRing?: Container     // mineral-extractor ring; spins only while on cooldown
+  __extractorActive?: boolean     // extractor on cooldown — ring should be spinning
+  __extractorWasActive?: boolean  // active state last frame, to detect the resume edge
+  __extractorPhase?: number       // rotation offset so the spin resumes without snapping
   __ctrlSegGraphics?: Graphics
   __ctrlSegSprites?: Sprite[]
   __ctrlLevel?: number
@@ -2342,7 +2352,17 @@ export class ObjectLayer {
         }
       }
       if (visual.__extractorRing) {
-        visual.__extractorRing.rotation = t_sec * EXTRACTOR_RING_SPEED
+        // Spin only while on cooldown, freeze otherwise. On the rising edge rebase the
+        // phase so the spin resumes from its current angle instead of snapping (the
+        // tower idle-sweep idiom).
+        const extActive = visual.__extractorActive === true
+        if (extActive && !visual.__extractorWasActive) {
+          visual.__extractorPhase = visual.__extractorRing.rotation - t_sec * EXTRACTOR_RING_SPEED
+        }
+        if (extActive) {
+          visual.__extractorRing.rotation = t_sec * EXTRACTOR_RING_SPEED + (visual.__extractorPhase ?? 0)
+        }
+        visual.__extractorWasActive = extActive
       }
       if (visual.__csRingGraphics && visual.__csColorDark !== undefined && visual.__csColorLight !== undefined) {
         drawCSRing(visual.__csRingGraphics, lerpColor(visual.__csColorDark, visual.__csColorLight, pulse))
@@ -2813,6 +2833,9 @@ export class ObjectLayer {
                 existing.__nukerGhodiumCap = ghodiumCap
                 this.startNukerFillAnimation(id, existing, fromE, fromECap, fromG, fromGCap, energy, energyCap, ghodium, ghodiumCap)
               }
+            }
+            if (obj.type === 'extractor') {
+              existing.__extractorActive = onCooldown(obj)
             }
             if (obj.type === 'factory') {
               const { bands, used, capacity } = getStoreBands(obj)
