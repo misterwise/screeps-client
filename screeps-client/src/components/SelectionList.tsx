@@ -704,8 +704,15 @@ function ExtensionDetails(props: { item: SelectedObject }) {
   }
   const hits = () => typeof raw().hits === 'number' ? (raw().hits as number) : null
   const hitsMax = () => typeof raw().hitsMax === 'number' ? (raw().hitsMax as number) : null
-  // Links carry a cooldown; extensions/towers don't, so the row only shows when present.
-  const cooldown = () => typeof raw().cooldown === 'number' ? (raw().cooldown as number) : null
+  // Links carry a relative `cooldown`; labs report an absolute `cooldownTime` (vanilla), so
+  // derive the remaining ticks from the current game time. The row only shows when present.
+  const cooldown = () => {
+    if (typeof raw().cooldown === 'number') return raw().cooldown as number
+    const ct = raw().cooldownTime
+    const gt = gameTime()
+    if (typeof ct === 'number' && gt !== null) return Math.max(0, ct - gt)
+    return null
+  }
   const notifyWhenAttacked = () => raw().notifyWhenAttacked === true
   const userId = () => typeof raw().user === 'string' ? (raw().user as string) : null
   const isMyStructure = () => userId() !== null && userId() === userInfo()?._id

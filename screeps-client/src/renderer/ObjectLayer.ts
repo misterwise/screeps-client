@@ -599,6 +599,31 @@ const LAB_BAR_H       = TILE_SIZE * 0.25
 const LAB_ENERGY_CAP  = 2000   // fallback when the server omits per-resource caps
 const LAB_MINERAL_CAP = 3000
 
+// Lab cooldown pulse: a soft white glow on the bowl's RIM (not a centre fill, which would
+// wash the mineral disc) that breathes while the lab is on reaction cooldown, matching
+// vanilla's pulsing lab highlight. Drawn once at peak opacity as a wide faint halo stroke
+// under a brighter core stroke, both on the bowl-rim radius; the ticker scales its alpha by
+// the per-tick pulse (0 → peak → 0).
+const LAB_GLOW_COLOR  = 0xFFFFFF
+const LAB_GLOW_RING_R = TILE_SIZE * 0.55   // bowl rim radius (matches the bowl's outer stroke)
+const LAB_GLOW_HALO_W = TILE_SIZE * 0.16   // wide, faint outer halo
+const LAB_GLOW_CORE_W = TILE_SIZE * 0.07   // brighter rim core
+const LAB_GLOW_HALO_A = 0.22
+const LAB_GLOW_CORE_A = 0.5
+function drawLabCooldownGlow(g: Graphics, cx: number, cy: number): void {
+  g.circle(cx, cy, LAB_GLOW_RING_R)
+  g.stroke({ width: LAB_GLOW_HALO_W, color: LAB_GLOW_COLOR, alpha: LAB_GLOW_HALO_A })
+  g.circle(cx, cy, LAB_GLOW_RING_R)
+  g.stroke({ width: LAB_GLOW_CORE_W, color: LAB_GLOW_COLOR, alpha: LAB_GLOW_CORE_A })
+}
+
+// Absolute tick a structure's cooldown ends (vanilla emits an absolute `cooldownTime`);
+// 0 when idle. Stored on the visual so the ticker can compare it against the live clock each
+// frame — `cooldownTime` is sent once and never re-sent, so a cached boolean would never clear.
+function cooldownEnd(obj: RoomObject): number {
+  return typeof obj.cooldownTime === 'number' ? obj.cooldownTime : 0
+}
+
 function getLabContents(obj: RoomObject): {
   energy: number; energyCap: number; mineralType: string | null; mineral: number; mineralCap: number
 } {
@@ -739,7 +764,6 @@ const FACT_GEAR_PTS = factoryGearPoints()
 function onCooldown(obj: RoomObject): boolean {
   return typeof obj.cooldown === 'number' && obj.cooldown > 0
 }
-
 function drawFactoryGear(g: Graphics, strokeColor: number): void {
   g.clear()
   g.poly(FACT_GEAR_PTS)
@@ -1597,6 +1621,16 @@ function createObjectVisual(
       labVisual.__labMineral = mineral
       labVisual.__labMineralCap = mineralCap
       updateLabFill(labVisual, calcCenterFillFraction(labEnergy, energyCap), calcCenterFillFraction(mineral, mineralCap))
+
+      // Cooldown pulse: a white halo over the bowl, alpha-pulsed by the ticker while the lab
+      // is on reaction cooldown. cooldownTime is absolute, so store it and compare against the
+      // live game clock each frame (see cooldownEnd) instead of caching a boolean.
+      const labCooldownG = new Graphics()
+      drawLabCooldownGlow(labCooldownG, cx, labCy)
+      labCooldownG.alpha = 0
+      container.addChild(labCooldownG)
+      labVisual.__labCooldownG = labCooldownG
+      labVisual.__labCooldownTime = cooldownEnd(obj)
       break
     }
     case 'container': {
@@ -1695,7 +1729,7 @@ function createObjectVisual(
       factVisual.__factoryUsed = factUsed
       factVisual.__factoryCapacity = factCap
       factVisual.__factoryLevel = factLevel
-      factVisual.__factoryActive = onCooldown(obj)
+      factVisual.__factoryCooldownEnd = cooldownEnd(obj)
       factVisual.__factoryGlowColor = outlineColor
       updateFactoryFill(factVisual, calcFactoryFillHeight(factUsed, factCap))
       break
@@ -2037,6 +2071,8 @@ type ContainerWithTarget = Container & {
   __labEnergyCap?: number
   __labMineral?: number
   __labMineralCap?: number
+  __labCooldownG?: Graphics
+  __labCooldownTime?: number   // absolute tick the reaction cooldown ends; pulse runs while > gameTime
   __nukerEnergyG?: Graphics
   __nukerGhodiumG?: Graphics
   __nukerEnergy?: number
@@ -2050,7 +2086,8 @@ type ContainerWithTarget = Container & {
   __factoryUsed?: number
   __factoryCapacity?: number
   __factoryLevel?: number
-  __factoryActive?: boolean
+  __factoryCooldownEnd?: number   // absolute tick the factory cooldown ends; glow pulses while > gameTime
+  __factoryWasOnCd?: boolean      // factory cooldown state last frame, to reset the outline on the falling edge
   __factoryGlowColor?: number
   __barrelContainer?: Container
   __towerAimAngle?: number   // target rotation while an action is active
@@ -2174,6 +2211,8 @@ export class ObjectLayer {
   private currentGameTime = 0
   private sayBubbles = new Set<string>()
   private moveDuration = 600
+  private tickMs = 2000        // full wall-clock duration of one game tick (from RoomViewer)
+  private lastTickAt = 0       // performance.now() when the current game tick began
   private readonly EXT_ANIM_DURATION = 300
   private instantMode = false
   private lastWorldScale = 1
@@ -2290,6 +2329,11 @@ export class ObjectLayer {
 
     // Tower barrel rotation + construction-site ring pulsation
     const pulse = 0.5 + 0.5 * Math.sin(now * 2 * Math.PI / CS_PULSE_MS)
+    // Tick-aligned pulse for the lab cooldown glow: one full breath (0 → 1 → 0) per game tick,
+    // so the rhythm stretches/compresses with the tick rate the way vanilla does, rather than
+    // running at a fixed wall-clock period.
+    const tickFrac = Math.min(1, (now - this.lastTickAt) / this.tickMs)
+    const labPulse = Math.sin(tickFrac * Math.PI)
     for (const visual of this.objects.values()) {
       if (visual.__barrelContainer) {
         const turret = visual.__barrelContainer
@@ -2323,9 +2367,24 @@ export class ObjectLayer {
       if (visual.__csRingGraphics && visual.__csColorDark !== undefined && visual.__csColorLight !== undefined) {
         drawCSRing(visual.__csRingGraphics, lerpColor(visual.__csColorDark, visual.__csColorLight, pulse))
       }
-      // Factory outline pulses brighter while producing (cooldown active).
-      if (visual.__factoryGearG && visual.__factoryActive) {
-        drawFactoryGear(visual.__factoryGearG, lerpColor(visual.__factoryGlowColor ?? ST_OUTLINE, FACT_GLOW, 0.5 * pulse))
+      // Factory outline pulses brighter while on cooldown. Like the lab, the factory's
+      // cooldownTime is absolute and sent once, so evaluate it live each frame and reset the
+      // outline to its static colour on the falling edge (no update fires when it expires).
+      if (visual.__factoryGearG) {
+        const facOnCd = (visual.__factoryCooldownEnd ?? 0) > this.currentGameTime
+        if (facOnCd) {
+          drawFactoryGear(visual.__factoryGearG, lerpColor(visual.__factoryGlowColor ?? ST_OUTLINE, FACT_GLOW, 0.5 * pulse))
+        } else if (visual.__factoryWasOnCd) {
+          drawFactoryGear(visual.__factoryGearG, visual.__factoryGlowColor ?? ST_OUTLINE)
+        }
+        visual.__factoryWasOnCd = facOnCd
+      }
+      // Lab cooldown pulse: the bowl halo completes one breath per game tick (alpha 0 → peak
+      // → 0, via labPulse) while the lab's absolute cooldownTime is still ahead of the live
+      // game clock — tick-aligned so the rhythm tracks the tick rate like vanilla.
+      if (visual.__labCooldownG) {
+        const onCd = (visual.__labCooldownTime ?? 0) > this.currentGameTime
+        visual.__labCooldownG.alpha = onCd ? labPulse : 0
       }
     }
 
@@ -2546,6 +2605,8 @@ export class ObjectLayer {
       this.users = users
     }
     if (gameTime !== undefined) {
+      // Stamp the wall-clock start of each new tick so the cooldown pulse can align to it.
+      if (gameTime !== this.currentGameTime) this.lastTickAt = performance.now()
       this.currentGameTime = gameTime
     }
     let roadsChanged = false
@@ -2756,6 +2817,7 @@ export class ObjectLayer {
                 existing.__labMineralCap = mineralCap
                 this.startLabFillAnimation(id, existing, fromE, fromECap, fromM, fromMCap, energy, energyCap, mineral, mineralCap)
               }
+              existing.__labCooldownTime = cooldownEnd(obj)
             }
             if (obj.type === 'nuker') {
               const { energy, energyCap, ghodium, ghodiumCap } = getNukerContents(obj)
@@ -2778,16 +2840,12 @@ export class ObjectLayer {
             if (obj.type === 'factory') {
               const { bands, used, capacity } = getStoreBands(obj)
               const level = typeof obj.level === 'number' ? obj.level : 0
-              const active = onCooldown(obj)
               if (existing.__factoryLevel !== level && existing.__factoryRingG) {
                 existing.__factoryLevel = level
                 drawFactoryRing(existing.__factoryRingG, level)
               }
-              if (existing.__factoryActive !== active) {
-                existing.__factoryActive = active
-                // Stopped producing — reset the outline to its static colour.
-                if (!active && existing.__factoryGearG) drawFactoryGear(existing.__factoryGearG, existing.__factoryGlowColor ?? ST_OUTLINE)
-              }
+              // Absolute cooldownTime; the ticker evaluates it live and resets on expiry.
+              existing.__factoryCooldownEnd = cooldownEnd(obj)
               if (existing.__factoryUsed !== used || existing.__factoryCapacity !== capacity) {
                 const fromUsed = existing.__factoryUsed ?? 0
                 const fromCap = existing.__factoryCapacity ?? capacity
@@ -3616,6 +3674,12 @@ export class ObjectLayer {
   /** Duration (ms) that creep movement interpolations should span. */
   setMoveDuration(ms: number): void {
     this.moveDuration = Math.max(0, ms)
+  }
+
+  // Full tick duration in ms — drives the lab cooldown pulse so one breath spans one tick
+  // (vanilla pulses per tick; a fixed wall-clock period would diverge at off-nominal tick rates).
+  setTickDuration(ms: number): void {
+    this.tickMs = Math.max(1, ms)
   }
 
   /**
