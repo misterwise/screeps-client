@@ -29,7 +29,6 @@ export function PerfHud() {
   })
 
   const n1 = (v: number) => (Math.round(v * 10) / 10).toFixed(1)
-  const n0 = (v: number) => Math.round(v).toString()
   // Adaptive: keep precision for sub-unit values (ms, fractions like
   // stateDirty), round cleanly for large counts.
   const fmtVal = (v: number) => {
