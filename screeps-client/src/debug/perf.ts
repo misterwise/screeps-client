@@ -105,11 +105,25 @@ class PerfMonitor {
   private readonly frames = new RingBuffer(FRAME_CAPACITY)
   private readonly series = new Map<string, RingBuffer>()
   private readonly listeners = new Set<() => void>()
+  private dirtySinceFrame = false
 
-  // Record one rendered frame's duration (ms between ticker callbacks).
+  // Record one rendered frame's duration (ms between ticker callbacks). Also
+  // records whether the scene was invalidated (a real game-state / camera
+  // change) since the last frame — render.stateDirty's average is the fraction
+  // of rendered frames driven by actual change vs. animation/cosmetics-only.
   frame(deltaMS: number): void {
     if (!this.enabled) return
     this.frames.push(deltaMS)
+    this.sample('render.stateDirty', this.dirtySinceFrame ? 1 : 0)
+    this.dirtySinceFrame = false
+  }
+
+  // Render-on-demand seed: change sources (tick update, camera move) call this
+  // when the scene actually changed. Used for measurement now; later it can
+  // gate whether a frame is rendered at all.
+  invalidate(): void {
+    if (!this.enabled) return
+    this.dirtySinceFrame = true
   }
 
   // Record one value of a named series (e.g. objects iterated this tick).

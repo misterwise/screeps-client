@@ -77,7 +77,20 @@ export class RoomRenderer {
     this.app.ticker.add(this.recordFrame)
   }
 
+  private _lastWorldX = NaN
+  private _lastWorldY = NaN
+  private _lastWorldScale = NaN
+
   private readonly recordFrame = (): void => {
+    // Camera pan/zoom is a real scene change → invalidate so render.stateDirty
+    // counts it (and so render-on-demand would render it).
+    const w = this.world
+    if (w.x !== this._lastWorldX || w.y !== this._lastWorldY || w.scale.x !== this._lastWorldScale) {
+      this._lastWorldX = w.x
+      this._lastWorldY = w.y
+      this._lastWorldScale = w.scale.x
+      perf.invalidate()
+    }
     perf.frame(this.app.ticker.deltaMS)
   }
 

@@ -481,6 +481,7 @@ export function RoomViewer(props: RoomViewerProps) {
     const r = renderer()
     const state = objectState()
     if (!r) return
+    perf.invalidate()  // a room:update / state change → scene is dirty this frame
     if (!state) {
       objLayer?.clear()
       animLayer?.clear()
