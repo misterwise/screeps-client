@@ -1,4 +1,5 @@
 import type { RoomObjectMap, RoomObjectDiff, RoomObject, RoomHistoryChunk } from 'screeps-connectivity'
+import { perf } from '~/debug/perf.js'
 
 interface GameHttpClient {
   game: {
@@ -44,8 +45,14 @@ export class HistoryPlayer {
   }
 
   private applyDiff(base: RoomObjectMap, diff: RoomObjectDiff): RoomObjectMap {
+    // Perf harness: the `{ ...base }` clone copies every object in the room just
+    // to apply a handful of changes. Sample cloned-count vs. changed-count so the
+    // waste is visible during history scrubbing.
+    const baseCount = perf.enabled ? Object.keys(base).length : 0
     const result = { ...base }
+    let changed = 0
     for (const id in diff) {
+      changed++
       const val = diff[id]
       if (val === null) {
         delete result[id]
@@ -54,6 +61,10 @@ export class HistoryPlayer {
       } else {
         result[id] = val as RoomObject
       }
+    }
+    if (perf.enabled) {
+      perf.sample('history.applyDiff.cloned', baseCount)
+      perf.sample('history.applyDiff.changed', changed)
     }
     return result
   }
