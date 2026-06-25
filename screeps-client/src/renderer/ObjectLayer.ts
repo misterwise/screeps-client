@@ -8,6 +8,7 @@ import type { LightingLayer } from './LightingLayer.js'
 const sharedBadgeCache = new BadgeTextureCache()
 import { TILE_SIZE } from './RoomRenderer.js'
 import { CONTROLLER_DOWNGRADE } from '~/utils/gameConstants.js'
+import { perf } from '~/debug/perf.js'
 import {
   BODY_PART_COLORS,
   OBJECT_COLORS,
@@ -2316,7 +2317,7 @@ export class ObjectLayer {
     this.container.addChild(this.roadGraphics)
     if (ticker) {
       this.ticker = ticker
-      this.tickerCallback = () => this.tick()
+      this.tickerCallback = () => perf.measure('objectLayer.tick', () => this.tick())
       ticker.add(this.tickerCallback)
     }
   }

@@ -1,6 +1,7 @@
 import { Container, Graphics, Ticker } from 'pixi.js'
 import { TILE_SIZE } from './RoomRenderer.js'
 import { ANIM_HARVEST, ANIM_UPGRADE, ANIM_BUILD, ANIM_REPAIR, ANIM_TRANSFER, ANIM_LINK_TRANSFER, ANIM_TOWER_ATTACK, ANIM_TOWER_HEAL, ANIM_TOWER_REPAIR, ANIM_LAB_REACTION } from './colors.js'
+import { perf } from '~/debug/perf.js'
 
 interface BeamAnimation {
   fromX: number
@@ -40,7 +41,7 @@ export class ActionAnimationLayer {
 
     if (ticker) {
       this.ticker = ticker
-      this.tickerCallback = () => this.animate()
+      this.tickerCallback = () => perf.measure('actionAnim.animate', () => this.animate())
       ticker.add(this.tickerCallback)
     }
   }

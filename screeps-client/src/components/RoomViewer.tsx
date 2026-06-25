@@ -712,11 +712,12 @@ export function RoomViewer(props: RoomViewerProps) {
     objLayer.setMoveDuration(moveDuration)
     objLayer.setTickDuration(tickMs)
     lastRawState = { objects: objs, users }
-    objLayer.update(objs, effectiveDiff, users, gameTime() ?? undefined)
+    perf.measure('roomViewer.objLayerUpdate', () => objLayer!.update(objs, effectiveDiff, users, gameTime() ?? undefined))
     objLayer.setShowLabels(untrack(showCreepLabels))
 
     const sayingIds = new Set<string>()
     if (animLayer) {
+      perf.markStart('roomViewer.actionLogScan')
       animLayer.clear()
       // Use for...in over Object.entries to avoid allocating a new array of arrays every tick
       for (const id in objs) {
@@ -789,6 +790,7 @@ export function RoomViewer(props: RoomViewerProps) {
           sayingIds.add(id)
         }
       }
+      perf.markEnd('roomViewer.actionLogScan')
     }
     objLayer.pruneSayBubblesExcept(sayingIds)
     if (untrack(roomDarkOverlay)) r.updateLighting(objs)

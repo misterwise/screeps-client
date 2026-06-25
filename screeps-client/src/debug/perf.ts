@@ -123,6 +123,56 @@ class PerfMonitor {
     s.push(value)
   }
 
+  // Time `fn`, recording its duration as a HUD sample series AND as a User
+  // Timing measure (a named entry visible in the DevTools Performance panel), so
+  // live recordings attribute frame cost to specific code paths. Returns fn()'s
+  // result; a no-op wrapper when disabled.
+  measure<T>(label: string, fn: () => T): T {
+    if (!this.enabled) return fn()
+    const start = `${label}:start`
+    const t0 = performance.now()
+    try {
+      performance.mark(start)
+    } catch {
+      // User Timing unavailable — fall back to plain duration sampling
+    }
+    try {
+      return fn()
+    } finally {
+      this.sample(label, performance.now() - t0)
+      try {
+        performance.measure(label, start)
+        performance.clearMarks(start)
+        performance.clearMeasures(label)
+      } catch {
+        // ignore — measure/clear unsupported or start mark missing
+      }
+    }
+  }
+
+  // Block-style timing for code that can't be wrapped in a closure. Pair
+  // markStart(label) … markEnd(label) with no early return between them.
+  markStart(label: string): void {
+    if (!this.enabled) return
+    try {
+      performance.mark(`${label}:start`)
+    } catch {
+      // ignore
+    }
+  }
+
+  markEnd(label: string): void {
+    if (!this.enabled) return
+    try {
+      const m = performance.measure(label, `${label}:start`)
+      if (m) this.sample(label, m.duration)
+      performance.clearMarks(`${label}:start`)
+      performance.clearMeasures(label)
+    } catch {
+      // ignore — start mark missing or unsupported
+    }
+  }
+
   setEnabled(on: boolean): void {
     this.enabled = on
     try {
