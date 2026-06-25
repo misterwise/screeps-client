@@ -74,5 +74,5 @@ Monitor) on an idle room. Capture idle vs. while-panning vs. (later) combat.
 
 | date | scenario | fps | render.stateDirty (avg) | notes |
 |---|---|---|---|---|
-| _pending_ | idle room, no camera move | | | first capture of the new metric |
-| _pending_ | same room, panning | | | should jump toward ~1.0 while dragging |
+| 2026-06-24 | W1S2 idle, ~370 obj, 120 Hz | 120 | **0.054 (5.4%)** | ~95% of renders had no game-state/camera change. Two snapshots agreed exactly (13/240). Frame work still sub-ms — pure render-count waste. |
+| _pending_ | same room, panning | | | snapshot *while dragging* (2 s buffer); should approach ~1.0 — also validates camera detection |
