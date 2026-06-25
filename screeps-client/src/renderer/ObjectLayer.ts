@@ -896,9 +896,15 @@ function isForeignCreep(obj: RoomObject, currentUserId?: string): boolean {
 
 // Invaders are NPC creeps owned by the built-in "Invader" user. They get a
 // dedicated angular-diamond visual rather than the circular player/foreign body.
+// The client's `users` map only carries real players — NPC users (Invader,
+// Source Keeper) are never sent — so we key off the engine's stable Invader user
+// id, which is always present on the creep from first render. The username check
+// is a fallback for any server that does populate NPC user info.
+const USER_INVADER = '2'  // Screeps engine NPC user id (official + screepsmod)
 function isInvaderCreep(obj: RoomObject, users?: Record<string, { username: string }>): boolean {
   const u = typeof obj.user === 'string' ? obj.user : undefined
   if (!u) return false
+  if (u === USER_INVADER) return true
   return users?.[u]?.username === 'Invader'
 }
 
