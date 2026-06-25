@@ -39,6 +39,16 @@ invalidated since the last frame (1/0).
 - Caveat: this counts tick + camera only. The remaining frames are
   *animation/cosmetic* — decomposing essential animation (creep interpolation,
   beams) from continuous cosmetic pulses is the next instrumentation step.
+- **`stateDirty ≈ tickRate / fps`.** On the test server (150 ms tick = 6.67
+  ticks/s) at 120 fps that's 6.67/120 ≈ **0.056** — matching the measured 0.054.
+  So `stateDirty` essentially just reports the tick cadence; it is **not** the
+  reclaimable fraction on its own.
+- **Interpolation fills most of each tick gap.** Move interpolation runs
+  ~0.9 × tick; at a 150 ms tick that's ~135 ms of every 150 ms. So in a room with
+  *moving* creeps the scene legitimately animates ~90% of frames → render-on-
+  demand saves little during active play. Its win concentrates on **idle
+  colonies** (creeps parked) and the **map view** (no interpolation). The
+  `maxFPS` cap, by contrast, helps universally.
 - `invalidate()` is also the **seed for render-on-demand**: the same signal can
   later gate whether a frame renders at all.
 
@@ -74,5 +84,5 @@ Monitor) on an idle room. Capture idle vs. while-panning vs. (later) combat.
 
 | date | scenario | fps | render.stateDirty (avg) | notes |
 |---|---|---|---|---|
-| 2026-06-24 | W1S2 idle, ~370 obj, 120 Hz | 120 | **0.054 (5.4%)** | ~95% of renders had no game-state/camera change. Two snapshots agreed exactly (13/240). Frame work still sub-ms — pure render-count waste. |
-| _pending_ | same room, panning | | | snapshot *while dragging* (2 s buffer); should approach ~1.0 — also validates camera detection |
+| 2026-06-24 | W1S2 idle, ~370 obj, 120 Hz, 150 ms tick | 120 | **0.054 (5.4%)** | Matches tick cadence exactly (6.67 ticks/s ÷ 120 = 5.6%). ~94% of renders had no tick/camera change. Frame work sub-ms — render-*count* waste. |
+| _pending_ | same room, panning | | | First attempt read idle (0.054) — drag frames aged out of the 2 s buffer before the console snapshot ran. Re-capture by **watching the HUD `render.stateDirty` live while dragging**, or `setTimeout(() => copy(__perf.snapshot()), 3000)` then drag. Should approach ~1.0 + validate camera detection. |

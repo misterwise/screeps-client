@@ -30,6 +30,15 @@ export function PerfHud() {
 
   const n1 = (v: number) => (Math.round(v * 10) / 10).toFixed(1)
   const n0 = (v: number) => Math.round(v).toString()
+  // Adaptive: keep precision for sub-unit values (ms, fractions like
+  // stateDirty), round cleanly for large counts.
+  const fmtVal = (v: number) => {
+    const a = Math.abs(v)
+    if (a === 0) return '0'
+    if (a < 1) return v.toFixed(3)
+    if (a < 10) return v.toFixed(2)
+    return Math.round(v).toString()
+  }
 
   const panel: Record<string, string> = {
     position: 'fixed',
@@ -72,10 +81,10 @@ export function PerfHud() {
 
         <For each={Object.entries(snap().series)}>
           {([name, s]) => (
-            <div style={row} title={`min ${n0(s.min)} · max ${n0(s.max)} · n ${s.n}`}>
+            <div style={row} title={`min ${fmtVal(s.min)} · max ${fmtVal(s.max)} · n ${s.n}`}>
               <span style={dim}>{name}</span>
               <span>
-                {n0(s.last)} <span style={dim}>(avg {n0(s.avg)})</span>
+                {fmtVal(s.last)} <span style={dim}>(avg {fmtVal(s.avg)})</span>
               </span>
             </div>
           )}
