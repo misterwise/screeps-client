@@ -4,6 +4,7 @@ import { LoginForm } from '~/components/LoginForm.js'
 import { ConnectingScreen } from '~/components/ConnectingScreen.js'
 import { Dashboard } from './Dashboard.js'
 import { Overview } from '~/components/Overview.js'
+import { Profile } from '~/components/Profile.js'
 import { route } from '~/stores/routeStore.js'
 import { isEmbedded, isXxscreepsMode, embeddedServerUrl } from '~/utils/embedded.js'
 import { createLogger } from '~/utils/log.js'
@@ -62,7 +63,11 @@ export function App() {
   return (
     <div style={{ width: '100%', height: '100%' }}>
       {isConnected()
-        ? (route() === 'overview' ? <Overview /> : <Dashboard />)
+        ? (route() === 'overview'
+            ? <Overview />
+            : route() === 'profile'
+              ? <Profile />
+              : <Dashboard />)
         : booting()
           ? <ConnectingScreen />
           : <LoginForm />}

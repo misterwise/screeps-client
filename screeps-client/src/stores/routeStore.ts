@@ -2,11 +2,16 @@ import { createSignal } from 'solid-js'
 import { basePath } from '~/utils/embedded.js'
 
 // Top-level screen the connected app shows. The in-game Dashboard owns its own
-// /room and /map sub-routing; this store only decides Overview vs. the game view.
-export type Route = 'overview' | 'game'
+// /room and /map sub-routing; this store decides Overview (self) vs. Profile
+// (public, any user) vs. the game view.
+export type Route = 'overview' | 'profile' | 'game'
 
 function overviewPath(): string {
   return `${basePath()}/overview`
+}
+
+function profilePrefix(): string {
+  return `${basePath()}/profile/`
 }
 
 function currentPath(): string {
@@ -14,20 +19,42 @@ function currentPath(): string {
 }
 
 function parseRoute(): Route {
-  return window.location.pathname === overviewPath() ? 'overview' : 'game'
+  const p = window.location.pathname
+  if (p === overviewPath()) return 'overview'
+  if (p.startsWith(profilePrefix())) return 'profile'
+  return 'game'
+}
+
+function parseProfileUsername(): string | null {
+  const p = window.location.pathname
+  if (!p.startsWith(profilePrefix())) return null
+  const name = decodeURIComponent(p.slice(profilePrefix().length))
+  return name || null
 }
 
 const [route, setRoute] = createSignal<Route>(parseRoute())
-export { route }
+const [profileUsername, setProfileUsername] = createSignal<string | null>(parseProfileUsername())
+export { route, profileUsername }
 
-// Remembered so returning from Overview restores the exact game view (room +
+// Remembered so returning to the world restores the exact game view (room +
 // shard + history tick) rather than dropping back to the default map.
 let lastGamePath = parseRoute() === 'game' ? currentPath() : `${basePath()}/map`
 
-export function goToOverview(): void {
+function rememberGamePath(): void {
   if (parseRoute() === 'game') lastGamePath = currentPath()
+}
+
+export function goToOverview(): void {
+  rememberGamePath()
   history.pushState(null, '', overviewPath())
   setRoute('overview')
+}
+
+export function goToProfile(username: string): void {
+  rememberGamePath()
+  history.pushState(null, '', `${profilePrefix()}${encodeURIComponent(username)}`)
+  setProfileUsername(username)
+  setRoute('profile')
 }
 
 export function goToGame(): void {
@@ -36,5 +63,8 @@ export function goToGame(): void {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('popstate', () => setRoute(parseRoute()))
+  window.addEventListener('popstate', () => {
+    setRoute(parseRoute())
+    setProfileUsername(parseProfileUsername())
+  })
 }

@@ -3,6 +3,8 @@ import { ChevronLeft } from 'lucide-solid'
 import type { ApiUserOverviewTotals } from 'screeps-connectivity'
 import { client, userInfo } from '~/stores/clientStore.js'
 import { goToGame } from '~/stores/routeStore.js'
+import { RankRing, GCL_RING, GCL_TEXT, GPL_RING, GPL_TEXT } from '~/components/RankRing.js'
+import { PlayerBadge } from '~/components/PlayerBadge.js'
 import { gclProgress, gplProgress, type LevelProgress } from '~/utils/levels.js'
 import { formatStat } from '~/utils/formatStat.js'
 
@@ -20,13 +22,6 @@ const BORDER = '#30363d'
 const TEXT = '#c9d1d9'
 const MUTED = '#8b949e'
 
-// Ring stroke + inner-number colors stay GCL-teal / GPL-red: these encode data,
-// not chrome.
-const GCL_RING = '#4DB6AC'
-const GCL_TEXT = '#A7FFEB'
-const GPL_RING = '#C54444'
-const GPL_TEXT = '#FF9A9A'
-
 const STAT_TILES: Array<{ key: keyof ApiUserOverviewTotals; l1: string; l2: string; color: string }> = [
   { key: 'energyControl', l1: 'Control', l2: 'points', color: '#A7FFEB' },
   { key: 'energyHarvested', l1: 'Energy', l2: 'harvested', color: '#ffe56d' },
@@ -36,26 +31,6 @@ const STAT_TILES: Array<{ key: keyof ApiUserOverviewTotals; l1: string; l2: stri
   { key: 'creepsLost', l1: 'Creeps', l2: 'lost', color: '#f96e76' },
   { key: 'powerProcessed', l1: 'Power', l2: 'processed', color: '#E04040' },
 ]
-
-function RankRing(props: { value: number; label: string; ring: string; text: string; fraction: number; tooltip: string }) {
-  const size = 84
-  const stroke = 8
-  const r = (size - stroke) / 2
-  const circ = 2 * Math.PI * r
-  const dash = () => `${Math.max(0, Math.min(1, props.fraction)) * circ} ${circ}`
-  return (
-    <div title={props.tooltip} style={{ position: 'relative', width: `${size}px`, height: `${size}px`, 'flex-shrink': '0' }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={props.ring} stroke-width={stroke} opacity={0.2} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={props.ring} stroke-width={stroke} stroke-linecap="round" stroke-dasharray={dash()} />
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', 'flex-direction': 'column', 'align-items': 'center', 'justify-content': 'center', color: props.text }}>
-        <div style={{ 'font-size': '26px', 'font-weight': 700, 'line-height': '1' }}>{props.value}</div>
-        <div style={{ 'font-size': '10px', 'font-weight': 300, 'letter-spacing': '0.5px' }}>{props.label}</div>
-      </div>
-    </div>
-  )
-}
 
 function StatTile(props: { l1: string; l2: string; color: string; value: number | undefined }) {
   return (
@@ -115,9 +90,12 @@ export function Overview() {
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'auto', background: BG, color: TEXT }}>
       <div style={{ 'max-width': '900px', margin: '0 auto', padding: '24px 16px 40px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', 'align-items': 'center', padding: '0 0 14px', 'border-bottom': `1px solid ${BORDER}`, 'margin-bottom': '24px' }}>
-          <h1 style={{ margin: 0, flex: 1, 'font-size': '22px', 'font-weight': 600, color: TEXT }}>Overview</h1>
+        {/* Header — this is the player's own account page, so it carries their identity. */}
+        <div style={{ display: 'flex', 'align-items': 'center', gap: '10px', padding: '0 0 14px', 'border-bottom': `1px solid ${BORDER}`, 'margin-bottom': '24px' }}>
+          <PlayerBadge badge={userInfo()?.badge} size={28} />
+          <h1 style={{ margin: 0, 'font-size': '22px', 'font-weight': 600, color: TEXT }}>Overview</h1>
+          <span style={{ color: MUTED, 'font-size': '14px' }}>{userInfo()?.username}</span>
+          <div style={{ flex: 1 }} />
           <button
             onClick={goToGame}
             title="Back to the world"
