@@ -6,6 +6,7 @@ import { sharedAtlasCache } from './AtlasCache.js'
 import { defaultSpriteTheme } from './themes/default.js'
 import { parseRoomName, formatRoomName } from '~/utils/roomName.js'
 import { getTerrainCacheBlob, saveTerrainCacheBlob, blobToImageBitmap } from './terrainCache.js'
+import { perf } from '~/debug/perf.js'
 import TerrainWorker from './terrain.worker.ts?worker'
 import {
   TERRAIN_WALL, TERRAIN_ROAD, TERRAIN_BORDER,
@@ -182,6 +183,7 @@ export class MapRenderer {
 
     this.setupInteraction()
     this.app.ticker.add(() => {
+      perf.frame(this.app.ticker.deltaMS)
       if (this.isAnimating) {
         const dx = this.animTargetX - this.world.x
         const dy = this.animTargetY - this.world.y

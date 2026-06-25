@@ -24,6 +24,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench": "vitest bench --run",
     "prepublishOnly": "pnpm build:all && node ../scripts/strip-client-devdeps.mjs"
   },
   "devDependencies": {

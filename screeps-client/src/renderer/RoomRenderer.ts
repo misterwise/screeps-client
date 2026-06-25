@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Sprite, Point, Rectangle } from 'pixi
 import { HoverHighlightLayer } from './HoverHighlightLayer.js'
 import { LightingLayer } from './LightingLayer.js'
 import type { Light } from './LightingLayer.js'
+import { perf } from '~/debug/perf.js'
 
 export const TILE_SIZE = 12
 export const ROOM_SIZE = 50 * TILE_SIZE
@@ -70,6 +71,14 @@ export class RoomRenderer {
     this.centerView()
     this.clampView()
     this.setupResizeObserver()
+
+    // Perf harness: record per-frame duration off the shared room ticker. The
+    // callback is torn down with the app in destroy(). No-op when perf is off.
+    this.app.ticker.add(this.recordFrame)
+  }
+
+  private readonly recordFrame = (): void => {
+    perf.frame(this.app.ticker.deltaMS)
   }
 
   bringNavOverlayToTop(): void {

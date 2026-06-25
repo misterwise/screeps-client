@@ -21,6 +21,7 @@ import { historyMode, historyTick, historyMinTick, historyMaxTick, setHistoryMax
 import { HistoryPlayer } from '~/stores/HistoryPlayer.js'
 import {flagDraft, roomViewMode, FLAG_COLOR_MAP, pendingTile, setPendingTile, clearPendingTile, setFlagDraft, modeHint, overlayAction, setOverlayAction, clearOverlayAction, buildDraft, confirmBuild, resetRoomViewMode, resetRoomViewModeOnNavigate} from '~/stores/roomViewStore';
 import { createLogger } from '~/utils/log.js'
+import { perf } from '~/debug/perf.js'
 
 const { log, error } = createLogger('room')
 
@@ -498,6 +499,15 @@ export function RoomViewer(props: RoomViewerProps) {
     // treat the first update as a full reconcile (diff=undefined) to rebuild the scene.
     const isFirstUpdate = !objLayer
     const effectiveDiff = isFirstUpdate ? undefined : diff
+
+    // Perf harness: this effect re-runs on every room:update because objectState()
+    // is replaced wholesale, and the actionLog loop below iterates *all* objects.
+    // Sample total-iterated vs. changed-only to expose the waste ratio per tick.
+    if (perf.enabled) {
+      const total = Object.keys(objs).length
+      perf.sample('roomViewer.objsIterated', total)
+      perf.sample('roomViewer.diffSize', effectiveDiff ? Object.keys(effectiveDiff).length : total)
+    }
 
     if (!objLayer) {
       log(`object layer created — ${props.room}`)

@@ -10,6 +10,7 @@ import { StatsBar } from '~/components/StatsBar.js'
 import { SettingsPanel } from '~/components/SettingsPanel.js'
 import { MotdOverlay } from '~/components/MotdOverlay.js'
 import { UserMenu } from '~/components/UserMenu.js'
+import { PerfHud } from '~/components/PerfHud.js'
 
 const CodePanel = lazy(() =>
   import('~/components/CodePanel.js').then((m) => ({ default: m.CodePanel })),
@@ -514,6 +515,7 @@ export function Dashboard() {
         </div>
       </Show>
       <ToastContainer />
+      <PerfHud />
     </div>
   )
 }
