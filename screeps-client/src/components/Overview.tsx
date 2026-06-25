@@ -13,6 +13,15 @@ const REFRESH_MS = 60_000
 // drives the (deferred) per-room punch-card, so any valid value works here.
 const STAT_INTERVAL = 8
 
+// App chrome (matches the Dashboard / GitHub-dark palette used across the site).
+const BG = '#0d1117'
+const PANEL = '#161b22'
+const BORDER = '#30363d'
+const TEXT = '#c9d1d9'
+const MUTED = '#8b949e'
+
+// Ring stroke + inner-number colors stay GCL-teal / GPL-red: these encode data,
+// not chrome.
 const GCL_RING = '#4DB6AC'
 const GCL_TEXT = '#A7FFEB'
 const GPL_RING = '#C54444'
@@ -50,11 +59,11 @@ function RankRing(props: { value: number; label: string; ring: string; text: str
 
 function StatTile(props: { l1: string; l2: string; color: string; value: number | undefined }) {
   return (
-    <div style={{ flex: 1, 'min-width': '0', background: '#222', 'border-radius': '4px', padding: '15px 8px 12px', 'box-shadow': '0 2px 2px rgba(0,0,0,0.2)', 'text-align': 'center' }}>
-      <div style={{ color: '#999', 'font-size': '11px', 'text-transform': 'uppercase', 'line-height': '1.3' }}>
+    <div style={{ flex: 1, 'min-width': '0', background: PANEL, border: `1px solid ${BORDER}`, 'border-radius': '6px', padding: '14px 8px 12px', 'text-align': 'center' }}>
+      <div style={{ color: MUTED, 'font-size': '11px', 'text-transform': 'uppercase', 'line-height': '1.3' }}>
         {props.l1}<br />{props.l2}
       </div>
-      <div style={{ color: props.color, 'font-size': '30px', 'font-weight': 300, 'margin-top': '8px' }}>{formatStat(props.value)}</div>
+      <div style={{ color: props.color, 'font-size': '28px', 'font-weight': 300, 'margin-top': '8px' }}>{formatStat(props.value)}</div>
     </div>
   )
 }
@@ -92,43 +101,54 @@ export function Overview() {
   const fraction = (p: LevelProgress) => (p.total > 0 ? p.current / p.total : 0)
   const tooltip = (p: LevelProgress) => `Next level: ${Math.floor(p.current).toLocaleString()} / ${Math.floor(p.total).toLocaleString()}`
 
+  const cardStyle = {
+    flex: 1,
+    display: 'flex',
+    'align-items': 'center',
+    gap: '16px',
+    background: PANEL,
+    border: `1px solid ${BORDER}`,
+    'border-radius': '6px',
+    padding: '16px',
+  }
+
   return (
-    <div style={{ width: '100%', height: '100%', overflow: 'auto', background: 'linear-gradient(#222, #111)', color: '#ccc', 'font-family': 'Roboto, system-ui, sans-serif' }}>
-      <div style={{ 'max-width': '900px', margin: '0 auto', padding: '30px 10px 40px' }}>
+    <div style={{ width: '100%', height: '100%', overflow: 'auto', background: BG, color: TEXT }}>
+      <div style={{ 'max-width': '900px', margin: '0 auto', padding: '24px 16px 40px' }}>
         {/* Header */}
-        <div style={{ display: 'flex', 'align-items': 'center', padding: '14px 20px', background: 'rgba(255,255,255,0.03)', 'border-radius': '4px', 'margin-bottom': '20px' }}>
-          <h1 style={{ margin: 0, flex: 1, 'font-size': '28px', 'font-weight': 400, color: '#ffd180' }}>Overview</h1>
+        <div style={{ display: 'flex', 'align-items': 'center', padding: '0 0 14px', 'border-bottom': `1px solid ${BORDER}`, 'margin-bottom': '24px' }}>
+          <h1 style={{ margin: 0, flex: 1, 'font-size': '22px', 'font-weight': 600, color: TEXT }}>Overview</h1>
           <button
             onClick={goToGame}
             title="Back to the world"
-            style={{ display: 'flex', 'align-items': 'center', gap: '4px', padding: '7px 12px', 'border-radius': '4px', border: '1px solid #30363d', background: '#21262d', color: '#c9d1d9', cursor: 'pointer' }}
+            style={{ display: 'flex', 'align-items': 'center', gap: '4px', padding: '7px 12px', 'border-radius': '4px', border: `1px solid ${BORDER}`, background: '#21262d', color: TEXT, cursor: 'pointer' }}
           >
             <ChevronLeft size={16} /> World
           </button>
         </div>
 
         {/* GCL / GPL cards */}
-        <div style={{ display: 'flex', gap: '20px', 'margin-bottom': '20px' }}>
-          <div style={{ flex: 1, display: 'flex', 'align-items': 'center', gap: '15px', background: '#222', 'border-radius': '4px', padding: '15px', 'box-shadow': '0 2px 2px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', gap: '16px', 'margin-bottom': '16px' }}>
+          <div style={cardStyle}>
             <RankRing value={gclProg().level} label="GCL" ring={GCL_RING} text={GCL_TEXT} fraction={fraction(gclProg())} tooltip={tooltip(gclProg())} />
             <div>
-              <div style={{ 'font-size': '18px', color: GCL_TEXT, 'margin-bottom': '6px' }}>Global Control Level</div>
+              <div style={{ 'font-size': '16px', 'font-weight': 600, color: TEXT, 'margin-bottom': '6px' }}>Global Control Level</div>
               {/* Vanilla labels this "Rooms" but renders the GCL level number; mirror it. */}
-              <div style={{ color: '#999', 'font-size': '13px' }}>
-                <span>Rooms: <strong style={{ color: '#ccc' }}>{gclProg().level}</strong></span>
-                <span style={{ 'margin-left': '14px' }}>CPU: <strong style={{ color: '#ccc' }}>{userInfo()?.cpu ?? '—'}</strong></span>
+              <div style={{ color: MUTED, 'font-size': '13px' }}>
+                <span>Rooms: <strong style={{ color: TEXT }}>{gclProg().level}</strong></span>
+                <span style={{ 'margin-left': '14px' }}>CPU: <strong style={{ color: TEXT }}>{userInfo()?.cpu ?? '—'}</strong></span>
               </div>
             </div>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', 'align-items': 'center', gap: '15px', background: '#222', 'border-radius': '4px', padding: '15px', 'box-shadow': '0 2px 2px rgba(0,0,0,0.2)' }}>
+          <div style={cardStyle}>
             <RankRing value={gplProg().level} label="GPL" ring={GPL_RING} text={GPL_TEXT} fraction={fraction(gplProg())} tooltip={tooltip(gplProg())} />
             <div>
-              <div style={{ 'font-size': '18px', color: GPL_TEXT, 'margin-bottom': '8px' }}>Global Power Level</div>
+              <div style={{ 'font-size': '16px', 'font-weight': 600, color: TEXT, 'margin-bottom': '8px' }}>Global Power Level</div>
               <button
                 disabled
                 title="Not available yet"
-                style={{ padding: '5px 10px', 'border-radius': '4px', border: `1px solid ${GPL_RING}`, background: 'transparent', color: '#ffb7ba', 'font-size': '11px', cursor: 'default', opacity: 0.6 }}
+                style={{ padding: '5px 10px', 'border-radius': '4px', border: `1px solid ${BORDER}`, background: '#21262d', color: MUTED, 'font-size': '12px', cursor: 'default', opacity: 0.7 }}
               >
                 Manage Power Creeps
               </button>
