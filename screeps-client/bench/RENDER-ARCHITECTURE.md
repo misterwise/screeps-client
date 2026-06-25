@@ -85,4 +85,4 @@ Monitor) on an idle room. Capture idle vs. while-panning vs. (later) combat.
 | date | scenario | fps | render.stateDirty (avg) | notes |
 |---|---|---|---|---|
 | 2026-06-24 | W1S2 idle, ~370 obj, 120 Hz, 150 ms tick | 120 | **0.054 (5.4%)** | Matches tick cadence exactly (6.67 ticks/s ÷ 120 = 5.6%). ~94% of renders had no tick/camera change. Frame work sub-ms — render-*count* waste. |
-| _pending_ | same room, panning | | | First attempt read idle (0.054) — drag frames aged out of the 2 s buffer before the console snapshot ran. Re-capture by **watching the HUD `render.stateDirty` live while dragging**, or `setTimeout(() => copy(__perf.snapshot()), 3000)` then drag. Should approach ~1.0 + validate camera detection. |
+| 2026-06-24 | same room, panning (live HUD) | 120 | climbs → ~1.0 | **Camera detection validated** — `render.stateDirty` rises live on the HUD during active drag/zoom. Console `snapshot()` can't catch it: the transient frames roll out of the 2 s buffer before the command runs. **Read the live HUD for transient states; snapshots only for steady state.** |
