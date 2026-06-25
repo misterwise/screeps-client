@@ -15,6 +15,7 @@ import {
   OBJ_DEFAULT, OBJ_ROAD, OBJ_FOREIGN, OBJ_CYAN, OBJ_GREY,
   ENERGY_FILL,
   CREEP_RING_DARK, CREEP_NOTCH,
+  INVADER_BODY, INVADER_RIM, INVADER_CORE, INVADER_GLOW,
   ST_DARK, ST_GRAY, ST_LIGHT, ST_OUTLINE, ST_ENERGY, ST_POWER, ST_RAMPART,
   ST_RAMPART_STROKE, ST_RAMPART_ENEMY, ST_RAMPART_ENEMY_STROKE,
   ST_RESOURCE_OTHER, RESOURCE_COLORS,
@@ -262,6 +263,48 @@ function drawCreepArc(g: Graphics, startAngle: number, endAngle: number, color: 
   g.arc(0, 0, CREEP_INNER_R, endAngle, startAngle, true)
   g.closePath()
   g.fill(color)
+}
+
+// Invader creeps render as a glowing red diamond — the vanilla NPC look — instead
+// of the circular body-part ring. A dark-red shell over a soft bloom, with an inner
+// core the ticker breathes. The diamond is symmetric so there's no facing notch, and
+// __bodyContainer is intentionally left unset (which also skips facing-rotation).
+const INVADER_SHELL_R = TILE_SIZE * 0.40  // diamond half-extent (centre → point)
+const INVADER_CORE_R  = TILE_SIZE * 0.18
+const INVADER_GLOW_R  = TILE_SIZE * 0.54
+const INVADER_RIM_W   = TILE_SIZE * 0.045
+
+function diamondPoly(cx: number, cy: number, r: number): number[] {
+  return [cx, cy - r, cx + r, cy, cx, cy + r, cx - r, cy]
+}
+
+function drawInvaderCreep(container: ContainerWithTarget): void {
+  const cx = TILE_SIZE / 2
+  const cy = TILE_SIZE / 2
+
+  // Soft red bloom behind the body (two diamonds for a gentle falloff).
+  const glow = new Graphics()
+  glow.poly(diamondPoly(cx, cy, INVADER_GLOW_R))
+  glow.fill({ color: INVADER_GLOW, alpha: 0.10 })
+  glow.poly(diamondPoly(cx, cy, INVADER_GLOW_R * 0.72))
+  glow.fill({ color: INVADER_GLOW, alpha: 0.16 })
+  container.addChild(glow)
+  container.__invaderGlow = glow
+
+  // Dark-red diamond shell with a brighter rim.
+  const shell = new Graphics()
+  shell.poly(diamondPoly(cx, cy, INVADER_SHELL_R))
+  shell.fill(INVADER_BODY)
+  shell.poly(diamondPoly(cx, cy, INVADER_SHELL_R))
+  shell.stroke({ width: INVADER_RIM_W, color: INVADER_RIM })
+  container.addChild(shell)
+
+  // Glowing inner diamond core (breathed by the ticker).
+  const core = new Graphics()
+  core.poly(diamondPoly(cx, cy, INVADER_CORE_R))
+  core.fill(INVADER_CORE)
+  container.addChild(core)
+  container.__invaderCore = core
 }
 
 function getCreepStore(obj: RoomObject): { used: number; capacity: number } {
@@ -882,6 +925,14 @@ function isForeignCreep(obj: RoomObject, currentUserId?: string): boolean {
   return creepUser !== currentUserId
 }
 
+// Invaders are NPC creeps owned by the built-in "Invader" user. They get a
+// dedicated angular-diamond visual rather than the circular player/foreign body.
+function isInvaderCreep(obj: RoomObject, users?: Record<string, { username: string }>): boolean {
+  const u = typeof obj.user === 'string' ? obj.user : undefined
+  if (!u) return false
+  return users?.[u]?.username === 'Invader'
+}
+
 function createObjectVisual(
   obj: RoomObject,
   showLabel = true,
@@ -905,6 +956,13 @@ function createObjectVisual(
 
   switch (obj.type) {
     case 'creep': {
+      // Invaders (NPC creeps) get the angular red-diamond look, bypassing the
+      // circular body-part ring / store / direction notch entirely.
+      if (isInvaderCreep(obj, users)) {
+        drawInvaderCreep(container as ContainerWithTarget)
+        break
+      }
+
       const FULL = 2 * Math.PI
 
       const bodyContainer = new Container()
@@ -2049,6 +2107,8 @@ type ContainerWithTarget = Container & {
   __creepBorderG?: Graphics
   __creepBadgeSprite?: Sprite
   __creepForeignMark?: Graphics
+  __invaderCore?: Graphics
+  __invaderGlow?: Graphics
   __towerFillGraphics?: Graphics
   __towerEnergy?: number
   __towerCapacity?: number
@@ -2383,6 +2443,9 @@ export class ObjectLayer {
         const onCd = (visual.__labCooldownTime ?? 0) > this.currentGameTime
         visual.__labCooldownG.alpha = onCd ? labPulse : 0
       }
+      // Invader diamond: breathe the inner core and the bloom.
+      if (visual.__invaderCore) visual.__invaderCore.alpha = 0.78 + 0.22 * pulse
+      if (visual.__invaderGlow) visual.__invaderGlow.alpha = 0.55 + 0.45 * pulse
     }
 
     // Fill tweens (extension/creep/tower/storage/container/terminal/factory/lab/nuker/link/source)
