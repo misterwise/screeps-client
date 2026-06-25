@@ -86,3 +86,18 @@ Monitor) on an idle room. Capture idle vs. while-panning vs. (later) combat.
 |---|---|---|---|---|
 | 2026-06-24 | W1S2 idle, ~370 obj, 120 Hz, 150 ms tick | 120 | **0.054 (5.4%)** | Matches tick cadence exactly (6.67 ticks/s ÷ 120 = 5.6%). ~94% of renders had no tick/camera change. Frame work sub-ms — render-*count* waste. |
 | 2026-06-24 | same room, panning (live HUD) | 120 | climbs → ~1.0 | **Camera detection validated** — `render.stateDirty` rises live on the HUD during active drag/zoom. Console `snapshot()` can't catch it: the transient frames roll out of the 2 s buffer before the command runs. **Read the live HUD for transient states; snapshots only for steady state.** |
+| 2026-06-24 | near-empty room (flag + roads), CPU% A/B | 30 vs 120 | n/a | maxFPS 30 ≈ **75%** vs uncapped ≈ **78–80%** → ~3–5% delta. Heavily confounded: server runs on the same machine, and the room is near-empty (little to render). Inconclusive but small. |
+
+## Verdict (2026-06-24)
+
+**Rendering is not a bottleneck on this content; render-on-demand is not worth
+the refactor.** Three independent measurements agree: frame work is sub-ms,
+idle `stateDirty` is just the tick cadence (5.4%), and a 30-vs-120 fps CPU A/B
+moved only ~3–5% (confounded). Render-on-demand's only real win is fully-idle
+scenes, which barely exist here — active rooms interpolate ~135 of every 150 ms.
+
+The `maxFPS` cap is a one-line, low-risk change worth keeping **only as an
+opt-in setting for laptop battery/thermals** — continuous 120 fps GPU draw still
+costs power even when CPU% is low (unmeasured here; the A/B was plugged-in with
+the server co-resident). Revisit the whole topic only on a genuinely heavy room,
+a low-end client, or a real "feels laggy" / battery report.
