@@ -62,6 +62,15 @@ export function goToGame(): void {
   setRoute('game')
 }
 
+// Jump straight to a specific room view (the Dashboard mounts on route→'game'
+// and reads room + shard from the URL).
+export function goToRoom(room: string, shard: string | null): void {
+  const path = `${basePath()}/room/${room}${shard ? `?shard=${encodeURIComponent(shard)}` : ''}`
+  lastGamePath = path
+  history.pushState(null, '', path)
+  setRoute('game')
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => {
     setRoute(parseRoute())

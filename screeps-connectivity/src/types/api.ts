@@ -46,6 +46,13 @@ export interface ApiUserOverviewResponse {
   statsMax?: number
 }
 
+/** Response of GET /api/user/rooms?id=<userId> — the rooms a user owns. Multishard servers key by shard; single-shard servers may return a flat list. */
+export interface ApiUserRoomsResponse {
+  ok: number
+  shards?: Record<string, string[]>
+  rooms?: string[]
+}
+
 export interface ApiAuthQueryTokenResponse {
   ok: number
   token: { full: boolean }

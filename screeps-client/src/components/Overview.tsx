@@ -1,10 +1,11 @@
-import { createSignal, onCleanup, onMount, For } from 'solid-js'
+import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
 import { ChevronLeft } from 'lucide-solid'
-import type { ApiUserOverviewTotals } from 'screeps-connectivity'
+import type { ApiUserOverviewTotals, ApiUserRoomsResponse } from 'screeps-connectivity'
 import { client, userInfo } from '~/stores/clientStore.js'
-import { goToGame } from '~/stores/routeStore.js'
+import { goToGame, goToRoom } from '~/stores/routeStore.js'
 import { RankRing, GCL_RING, GCL_TEXT, GPL_RING, GPL_TEXT } from '~/components/RankRing.js'
 import { PlayerBadge } from '~/components/PlayerBadge.js'
+import { RoomPreviewTile } from '~/components/RoomPreviewTile.js'
 import { gclProgress, gplProgress, type LevelProgress } from '~/utils/levels.js'
 import { formatStat } from '~/utils/formatStat.js'
 
@@ -43,13 +44,32 @@ function StatTile(props: { l1: string; l2: string; color: string; value: number 
   )
 }
 
+interface OwnedRoom {
+  room: string
+  shard: string | null
+}
+
+// The rooms endpoint shape varies by server: multishard keys rooms by shard,
+// single-shard may return a flat list. Normalize both to {room, shard}.
+function extractOwnedRooms(res: ApiUserRoomsResponse): OwnedRoom[] {
+  if (res.shards) {
+    return Object.entries(res.shards).flatMap(([shard, list]) =>
+      (list ?? []).map((room) => ({ room, shard })))
+  }
+  return (res.rooms ?? []).map((room) => ({ room, shard: null }))
+}
+
 export function Overview() {
   const [totals, setTotals] = createSignal<ApiUserOverviewTotals | null>(null)
+  const [rooms, setRooms] = createSignal<OwnedRoom[]>([])
 
   onMount(() => {
     const c = client()
     if (!c) return
     let timer: ReturnType<typeof setInterval> | null = null
+
+    const uid = userInfo()?._id
+    if (uid) void c.http.user.rooms(uid).then((res) => setRooms(extractOwnedRooms(res))).catch(() => {})
 
     const fetchOverview = () =>
       c.http.user.overview(STAT_INTERVAL, 'energyHarvested').then((res) => setTotals(res.totals ?? null))
@@ -140,6 +160,18 @@ export function Overview() {
             {(t) => <StatTile l1={t.l1} l2={t.l2} color={t.color} value={totals()?.[t.key]} />}
           </For>
         </div>
+
+        {/* Owned-room minimaps */}
+        <Show when={rooms().length}>
+          <div style={{ 'margin-top': '24px' }}>
+            <div style={{ color: MUTED, 'font-size': '11px', 'text-transform': 'uppercase', 'margin-bottom': '12px' }}>Rooms</div>
+            <div style={{ display: 'flex', 'flex-wrap': 'wrap', gap: '16px' }}>
+              <For each={rooms()}>
+                {(r) => <RoomPreviewTile room={r.room} shard={r.shard} onClick={() => goToRoom(r.room, r.shard)} />}
+              </For>
+            </div>
+          </div>
+        </Show>
       </div>
     </div>
   )
