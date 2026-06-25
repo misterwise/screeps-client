@@ -21,9 +21,29 @@ export interface ApiAuthMeResponse {
   username: string
   cpu: number
   gcl: number
+  /** Raw accumulated power points; Global Power Level derives from this. Absent on servers without the power system. */
+  power?: number
   credits: number
   badge: import('./game.js').Badge
   password: boolean
+}
+
+/** Per-stat lifetime totals over the requested interval — the values behind the Overview stat tiles. Individual fields may be absent on servers that don't track that stat. */
+export interface ApiUserOverviewTotals {
+  energyControl?: number
+  energyHarvested?: number
+  energyConstruction?: number
+  energyCreeps?: number
+  creepsProduced?: number
+  creepsLost?: number
+  powerProcessed?: number
+}
+
+/** Response of GET /api/user/overview. Only `totals` is consumed by the Overview tiles; per-room time series (shards/stats) are omitted until the room band is built. */
+export interface ApiUserOverviewResponse {
+  ok: number
+  totals?: ApiUserOverviewTotals
+  statsMax?: number
 }
 
 export interface ApiAuthQueryTokenResponse {
