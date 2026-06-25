@@ -86,6 +86,9 @@ export function RoomPreviewTile(props: { room: string; shard: string | null; onC
     if (!c) return
     c.stores.room.terrain(props.room, props.shard).then((t) => { terrain = t; draw() }).catch(() => {})
     const sub = c.stores.map.subscribeMap2(props.room, props.shard)
+    // Synchronous first paint from the in-memory cache. subscribeMap2 also schedules
+    // a warm-start 'room:map2update' (cache) a microtask later, so this only avoids a
+    // one-frame empty flash; the listener below repaints with the same/fresh data.
     const seed = c.stores.map.map2data(props.room, props.shard)
     if (seed) { map2 = seed; draw() }
     // Long-lived listener: reads live props at invocation time to filter for this

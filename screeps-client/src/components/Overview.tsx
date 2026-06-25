@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount, For, Show } from 'solid-js'
 import { ChevronLeft } from 'lucide-solid'
 import type { ApiUserOverviewTotals, ApiUserRoomsResponse } from 'screeps-connectivity'
 import { client, userInfo } from '~/stores/clientStore.js'
@@ -63,13 +63,24 @@ export function Overview() {
   const [totals, setTotals] = createSignal<ApiUserOverviewTotals | null>(null)
   const [rooms, setRooms] = createSignal<OwnedRoom[]>([])
 
+  // Fetch the owned-room list once the user id is available. Read reactively
+  // (not once in onMount) so this doesn't depend on auth resolving before mount;
+  // the guard makes it fire exactly once, retrying only on error.
+  let roomsRequested = false
+  createEffect(() => {
+    const c = client()
+    const uid = userInfo()?._id
+    if (!c || !uid || roomsRequested) return
+    roomsRequested = true
+    void c.http.user.rooms(uid)
+      .then((res) => setRooms(extractOwnedRooms(res)))
+      .catch(() => { roomsRequested = false })
+  })
+
   onMount(() => {
     const c = client()
     if (!c) return
     let timer: ReturnType<typeof setInterval> | null = null
-
-    const uid = userInfo()?._id
-    if (uid) void c.http.user.rooms(uid).then((res) => setRooms(extractOwnedRooms(res))).catch(() => {})
 
     const fetchOverview = () =>
       c.http.user.overview(STAT_INTERVAL, 'energyHarvested').then((res) => setTotals(res.totals ?? null))

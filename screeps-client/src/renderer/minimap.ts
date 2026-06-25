@@ -9,7 +9,9 @@ import { ENERGY_FILL, OBJ_CYAN, OBJ_ORANGE, OBJ_GREEN, OBJ_FOREIGN, TERRAIN_ROAD
 export const MINIMAP_TILE = 3
 export const MINIMAP_ROOM = MINIMAP_TILE * 50
 
-// Terrain fill (matches the baked terrain worker's hues).
+// Terrain fill (matches the baked terrain worker's hues). MINIMAP_PLAIN is
+// deliberately its own value, NOT colors.TERRAIN_PLAIN — the minimap uses a
+// darker, desaturated plain than the in-room terrain. Keep them independent.
 export const MINIMAP_PLAIN = 0x2d333b
 export const MINIMAP_WALL = 0x0d1117
 export const MINIMAP_SWAMP = 0x3d5a3d
@@ -37,6 +39,8 @@ export const MAP2_DOT_FEATURES: Map2DotFeature[] = [
 ]
 
 // Reserved map2 keys with fixed meaning; any other key is a userId (objects).
+// Note 'p' (portals) is reserved here so it's excluded from the userId loop, but
+// no minimap renderer draws portals — they're intentionally omitted.
 export const MAP2_FIXED_KEYS = new Set(['w', 'r', 'pb', 'p', 's', 'c', 'm', 'k', 'd'])
 
 // 0xrrggbb → '#rrggbb' for 2D-canvas fillStyle.
