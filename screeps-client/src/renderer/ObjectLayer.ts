@@ -265,11 +265,7 @@ function drawCreepArc(g: Graphics, startAngle: number, endAngle: number, color: 
   g.fill(color)
 }
 
-// Invader creeps render as a glowing red diamond — the vanilla NPC look — instead
-// of the circular body-part ring. A dark-red shell over a soft bloom, with an inner
-// core the ticker breathes. The diamond is symmetric so there's no facing notch, and
-// __bodyContainer is intentionally left unset (which also skips facing-rotation).
-const INVADER_SHELL_R = TILE_SIZE * 0.40  // diamond half-extent (centre → point)
+const INVADER_SHELL_R = TILE_SIZE * 0.40
 const INVADER_CORE_R  = TILE_SIZE * 0.18
 const INVADER_GLOW_R  = TILE_SIZE * 0.54
 const INVADER_RIM_W   = TILE_SIZE * 0.045
@@ -278,11 +274,11 @@ function diamondPoly(cx: number, cy: number, r: number): number[] {
   return [cx, cy - r, cx + r, cy, cx, cy + r, cx - r, cy]
 }
 
+// __bodyContainer is left unset so tick() skips facing-rotation — the diamond is symmetric.
 function drawInvaderCreep(container: ContainerWithTarget): void {
   const cx = TILE_SIZE / 2
   const cy = TILE_SIZE / 2
 
-  // Soft red bloom behind the body (two diamonds for a gentle falloff).
   const glow = new Graphics()
   glow.poly(diamondPoly(cx, cy, INVADER_GLOW_R))
   glow.fill({ color: INVADER_GLOW, alpha: 0.10 })
@@ -291,7 +287,6 @@ function drawInvaderCreep(container: ContainerWithTarget): void {
   container.addChild(glow)
   container.__invaderGlow = glow
 
-  // Dark-red diamond shell with a brighter rim.
   const shell = new Graphics()
   shell.poly(diamondPoly(cx, cy, INVADER_SHELL_R))
   shell.fill(INVADER_BODY)
@@ -299,7 +294,6 @@ function drawInvaderCreep(container: ContainerWithTarget): void {
   shell.stroke({ width: INVADER_RIM_W, color: INVADER_RIM })
   container.addChild(shell)
 
-  // Glowing inner diamond core (breathed by the ticker).
   const core = new Graphics()
   core.poly(diamondPoly(cx, cy, INVADER_CORE_R))
   core.fill(INVADER_CORE)
@@ -925,13 +919,9 @@ function isForeignCreep(obj: RoomObject, currentUserId?: string): boolean {
   return creepUser !== currentUserId
 }
 
-// Invaders are NPC creeps owned by the built-in "Invader" user. They get a
-// dedicated angular-diamond visual rather than the circular player/foreign body.
-// The client's `users` map only carries real players — NPC users (Invader,
-// Source Keeper) are never sent — so we key off the engine's stable Invader user
-// id, which is always present on the creep from first render. The username check
-// is a fallback for any server that does populate NPC user info.
-const USER_INVADER = '2'  // Screeps engine NPC user id (official + screepsmod)
+// NPC users are never sent in the client `users` map, so detect by the engine's
+// stable Invader user id rather than username (which would never resolve).
+const USER_INVADER = '2'
 function isInvaderCreep(obj: RoomObject, users?: Record<string, { username: string }>): boolean {
   const u = typeof obj.user === 'string' ? obj.user : undefined
   if (!u) return false
@@ -962,8 +952,6 @@ function createObjectVisual(
 
   switch (obj.type) {
     case 'creep': {
-      // Invaders (NPC creeps) get the angular red-diamond look, bypassing the
-      // circular body-part ring / store / direction notch entirely.
       if (isInvaderCreep(obj, users)) {
         drawInvaderCreep(container as ContainerWithTarget)
         break
@@ -2449,7 +2437,6 @@ export class ObjectLayer {
         const onCd = (visual.__labCooldownTime ?? 0) > this.currentGameTime
         visual.__labCooldownG.alpha = onCd ? labPulse : 0
       }
-      // Invader diamond: breathe the inner core and the bloom.
       if (visual.__invaderCore) visual.__invaderCore.alpha = 0.78 + 0.22 * pulse
       if (visual.__invaderGlow) visual.__invaderGlow.alpha = 0.55 + 0.45 * pulse
     }
