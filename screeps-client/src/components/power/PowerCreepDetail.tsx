@@ -247,7 +247,8 @@ export function PowerCreepDetail(props: { ctx: PowerContext; id: string | null }
               title={`Do you really want to delete "${cr().name}"?`}
               body={
                 <>
-                  You will lose <strong style={{ color: POWER_RED }}>{cr().level + 1} Power Level{cr().level + 1 === 1 ? '' : 's'}</strong> in your account. This can't be undone once the deletion completes.
+                  You will lose <strong style={{ color: POWER_RED }}>1 Power Level</strong> in your account.
+                  The creep's upgrade levels are returned, but the creation level is gone for good.
                 </>
               }
               confirmLabel="Delete"
