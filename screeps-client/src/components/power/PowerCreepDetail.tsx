@@ -169,7 +169,7 @@ export function PowerCreepDetail(props: { ctx: PowerContext; id: string | null }
 
             {/* Budget + danger */}
             <div style={{ 'text-align': 'right', 'font-size': '12px', color: MUTED }}>
-              <div>Free GPL <strong style={{ color: freeRemaining() > 0 ? GPL_TEXT : MUTED }}>{freeRemaining()}</strong> / {props.ctx.gpl()}</div>
+              <div>Free GPL <strong style={{ color: freeRemaining() > 0 ? GPL_TEXT : MUTED }}>{Math.max(0, freeRemaining())}</strong> / {props.ctx.gpl()}</div>
               <Show when={dirty()}><div style={{ color: ACCENT, 'margin-top': '2px' }}>{totalIncrements()} staged</div></Show>
             </div>
             <Show

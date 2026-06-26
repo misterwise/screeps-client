@@ -16,7 +16,6 @@ import { gplLevel } from '~/utils/levels.js'
 export const POWER_CREEP_CLASSES = ['operator', 'commander', 'executor'] as const
 export type PowerCreepClass = (typeof POWER_CREEP_CLASSES)[number]
 
-/** A power creep costs `level + 1` account power levels (the +1 is creation). */
 export const POWER_CREEP_MAX_LEVEL = 25
 export const POWER_LEVELS = [1, 2, 3, 4, 5] as const
 
@@ -64,10 +63,10 @@ export const PWR = {
   DISRUPT_SPAWN: 9,
   DISRUPT_TOWER: 10,
   DISRUPT_SOURCE: 11,
-  DISRUPT_TERMINAL: 12,
-  SHIELD: 13,
-  REGEN_SOURCE: 14,
-  REGEN_MINERAL: 15,
+  SHIELD: 12,
+  REGEN_SOURCE: 13,
+  REGEN_MINERAL: 14,
+  DISRUPT_TERMINAL: 15,
   OPERATE_POWER: 16,
   FORTIFY: 17,
   OPERATE_CONTROLLER: 18,

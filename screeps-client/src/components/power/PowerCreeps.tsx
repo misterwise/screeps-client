@@ -66,13 +66,13 @@ export function PowerCreeps() {
           <div style={{ background: PANEL, border: `1px solid ${BORDER}`, 'border-radius': '6px', padding: '6px 12px', 'font-size': '13px', color: MUTED }}>
             Global Power Level <strong style={{ color: GPL_TEXT, 'margin-left': '4px' }}>{gpl()}</strong>
             <span style={{ margin: '0 6px', color: BORDER }}>·</span>
-            <strong style={{ color: free() > 0 ? GPL_TEXT : MUTED }}>{free()}</strong> free
+            <strong style={{ color: free() > 0 ? GPL_TEXT : MUTED }}>{Math.max(0, free())}</strong> free
           </div>
         </div>
 
         <Show when={error()}>
           <div style={{ background: PANEL, border: `1px solid ${BORDER}`, 'border-radius': '8px', padding: '32px', 'text-align': 'center', color: MUTED }}>
-            Power creeps aren't available on this server.
+            Couldn't load power creeps — this server may not support them.
           </div>
         </Show>
 
