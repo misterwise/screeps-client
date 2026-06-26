@@ -11,7 +11,7 @@ import type { PowerContext } from './PowerCreeps.js'
 import { PowerClassIcon } from './PowerClassIcon.js'
 import { PowerTile } from './PowerTile.js'
 import { ConfirmDialog } from './ConfirmDialog.js'
-import { PANEL, BORDER, TEXT, MUTED, ACCENT, GREEN, GPL_TEXT } from './theme.js'
+import { PANEL, BORDER, TEXT, MUTED, ACCENT, GREEN, GPL_TEXT, POWER_RED } from './theme.js'
 
 export function PowerCreepDetail(props: { ctx: PowerContext; id: string | null }) {
   const creep = () => props.ctx.creeps().find((c) => c._id === props.id) ?? null
@@ -244,8 +244,12 @@ export function PowerCreepDetail(props: { ctx: PowerContext; id: string | null }
           </Show>
           <Show when={confirmDelete()}>
             <ConfirmDialog
-              title={`Delete "${cr().name}"?`}
-              body="The creep will be scheduled for deletion. You can cancel before it completes."
+              title={`Do you really want to delete "${cr().name}"?`}
+              body={
+                <>
+                  You will lose <strong style={{ color: POWER_RED }}>{cr().level + 1} Power Level{cr().level + 1 === 1 ? '' : 's'}</strong> in your account. This can't be undone once the deletion completes.
+                </>
+              }
               confirmLabel="Delete"
               onConfirm={() => void doDelete()}
               onCancel={() => setConfirmDelete(false)}
