@@ -13,7 +13,8 @@ type Row = ApiMarketOrder & { range?: number }
 type Sort = `${'+' | '-'}${string}`
 
 // Chebyshev room distance — the market's notion of "range" for shipping cost.
-// Matches vanilla: invalid target rooms yield 0.
+// Returns undefined for an order with no room or an unparseable target (rendered
+// as "—"); withRange also skips the computation entirely for invalid targets.
 function roomDistance(a: string | undefined, target: string): number | undefined {
   if (!a) return undefined
   const pa = parseRoomName(a)
@@ -48,21 +49,33 @@ export function MarketResource(props: { resourceType: string | null; shard: stri
 
   const isToken = () => props.resourceType === 'token'
 
+  // Guards against out-of-order responses when the resource or shard changes
+  // mid-flight: stale responses (id !== reqId) are ignored.
+  let reqId = 0
+
   const load = (): void => {
     const c = client()
     const rt = props.resourceType
     if (!c || !rt) return
+    const id = ++reqId
     setLoading(true)
-    Promise.all([c.http.game.market.orders(rt, props.shard), c.http.game.market.stats(rt, props.shard)])
-      .then(([ordersRes, statsRes]) => {
-        const list = ordersRes.list ?? []
+    c.http.game.market
+      .orders(rt, props.shard)
+      .then((res) => {
+        if (id !== reqId) return
+        const list = res.list ?? []
         setSell(list.filter((o) => o.type === 'sell'))
         setBuy(list.filter((o) => o.type === 'buy'))
-        setStats(statsRes.stats ?? [])
         setError(null)
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false))
+      .catch((err) => { if (id === reqId) setError(err instanceof Error ? err.message : String(err)) })
+      .finally(() => { if (id === reqId) setLoading(false) })
+    // Price history loads independently — on servers without market stats its
+    // failure should leave the order book intact, not blank the whole page.
+    c.http.game.market
+      .stats(rt, props.shard)
+      .then((res) => { if (id === reqId) setStats(res.stats ?? []) })
+      .catch(() => { if (id === reqId) setStats([]) })
   }
 
   createEffect(() => {

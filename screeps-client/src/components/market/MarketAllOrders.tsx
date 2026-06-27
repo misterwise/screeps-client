@@ -13,21 +13,27 @@ export function MarketAllOrders(props: { shard: string | null }) {
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal<string | null>(null)
 
+  // Guards against out-of-order responses when the shard changes mid-flight: a
+  // stale response (id !== reqId) is ignored so the latest request always wins.
+  let reqId = 0
+
   createEffect(() => {
     const shard = props.shard
     const c = client()
     if (!c) return
+    const id = ++reqId
     setLoading(true)
     void c.http.game.market
       .ordersIndex(shard)
       .then((res) => {
+        if (id !== reqId) return
         const map: Record<string, number> = {}
         for (const entry of res.list ?? []) map[entry._id] = entry.count
         setCounts(map)
         setError(null)
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false))
+      .catch((err) => { if (id === reqId) setError(err instanceof Error ? err.message : String(err)) })
+      .finally(() => { if (id === reqId) setLoading(false) })
   })
 
   return (
