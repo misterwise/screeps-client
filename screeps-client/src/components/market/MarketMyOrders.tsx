@@ -6,6 +6,7 @@ import { goToMarketResource, goToRoom } from '~/stores/routeStore.js'
 import { resourceDisplayName } from '~/data/resources.js'
 import { ResourceSwatch } from './ResourceSwatch.js'
 import { PANEL, BORDER, TEXT, MUTED, ACCENT, POS, NEG, fmtAmount, fmtPrice } from './theme.js'
+import { Card, rowBg } from './ui.js'
 
 interface ShardGroup {
   shard: string | null
@@ -70,32 +71,30 @@ export function MarketMyOrders() {
           <For each={groups()}>
             {(group) => (
               <Show when={group.orders.length}>
-                <div style={{ 'margin-bottom': '28px' }}>
-                  <Show when={multiShard()}>
-                    <div style={{ color: MUTED, 'font-size': '13px', 'margin-bottom': '8px' }}>
-                      {group.orders.length} {group.orders.length === 1 ? 'order' : 'orders'} on <strong style={{ color: TEXT }}>{group.shard}</strong>
-                    </div>
-                  </Show>
+                <Card
+                  title={multiShard() ? (group.shard ?? 'My orders') : 'My orders'}
+                  right={<span style={{ color: MUTED, 'font-size': '12px' }}>{group.orders.length} {group.orders.length === 1 ? 'order' : 'orders'}</span>}
+                >
                   <table style={{ width: '100%', 'border-collapse': 'collapse', 'font-size': '13px' }}>
                     <thead>
                       <tr style={{ color: MUTED, 'text-align': 'right' }}>
-                        <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 6px' }}>Order ID</th>
-                        <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 6px' }}>Resource</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Type</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Active</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Price</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Available</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Remaining</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Total</th>
-                        <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Room</th>
+                        <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 7px 6px', 'border-bottom': `1px solid ${BORDER}` }}>Order ID</th>
+                        <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Resource</th>
+                        <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Type</th>
+                        <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Active</th>
+                        <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Price</th>
+                        <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Available</th>
+                        <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Remaining</th>
+                        <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Total</th>
+                        <th style={{ 'font-weight': 400, padding: '0 6px 7px 0', 'border-bottom': `1px solid ${BORDER}` }}>Room</th>
                       </tr>
                     </thead>
                     <tbody>
                       <For each={group.orders}>
-                        {(o) => (
-                          <tr style={{ 'border-top': `1px solid ${BORDER}`, 'text-align': 'right' }}>
-                            <td style={{ 'text-align': 'left', color: MUTED, 'font-family': 'monospace', padding: '6px 8px 6px 0' }}>{o._id}</td>
-                            <td style={{ 'text-align': 'left', padding: '6px 0' }}>
+                        {(o, i) => (
+                          <tr style={{ background: rowBg(i()), 'text-align': 'right' }}>
+                            <td style={{ 'text-align': 'left', color: MUTED, 'font-family': 'monospace', padding: '7px 8px 7px 6px' }}>{o._id}</td>
+                            <td style={{ 'text-align': 'left', padding: '7px 0' }}>
                               <a
                                 href="#"
                                 onClick={(e) => { e.preventDefault(); goToMarketResource(o.resourceType, group.shard) }}
@@ -105,13 +104,13 @@ export function MarketMyOrders() {
                                 {resourceDisplayName(o.resourceType)}
                               </a>
                             </td>
-                            <td style={{ color: TEXT, padding: '6px 0' }}>{o.type === 'sell' ? 'Selling' : 'Buying'}</td>
-                            <td style={{ color: o.active ? POS : NEG, padding: '6px 0' }}>{o.active ? 'Yes' : 'No'}</td>
-                            <td style={{ color: TEXT, padding: '6px 0' }}>{fmtPrice(o.price)}</td>
-                            <td style={{ color: TEXT, padding: '6px 0' }}>{fmtAmount(o.amount)}</td>
-                            <td style={{ color: MUTED, padding: '6px 0' }}>{fmtAmount(o.remainingAmount)}</td>
-                            <td style={{ color: MUTED, padding: '6px 0' }}>{fmtAmount(o.totalAmount)}</td>
-                            <td style={{ padding: '6px 0' }}>
+                            <td style={{ color: o.type === 'sell' ? POS : NEG, padding: '7px 0' }}>{o.type === 'sell' ? 'Selling' : 'Buying'}</td>
+                            <td style={{ color: o.active ? POS : NEG, padding: '7px 0' }}>{o.active ? 'Yes' : 'No'}</td>
+                            <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtPrice(o.price)}</td>
+                            <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(o.amount)}</td>
+                            <td style={{ color: MUTED, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(o.remainingAmount)}</td>
+                            <td style={{ color: MUTED, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(o.totalAmount)}</td>
+                            <td style={{ padding: '7px 6px 7px 0' }}>
                               <Show when={o.roomName} fallback={<span style={{ color: MUTED }}>—</span>}>
                                 <a
                                   href="#"
@@ -127,7 +126,7 @@ export function MarketMyOrders() {
                       </For>
                     </tbody>
                   </table>
-                </div>
+                </Card>
               </Show>
             )}
           </For>

@@ -3,6 +3,7 @@ import { RefreshCw, ChevronsLeft, ChevronsRight } from 'lucide-solid'
 import type { ApiUserMoneyHistoryResponse } from 'screeps-connectivity'
 import { client } from '~/stores/clientStore.js'
 import { PANEL, BORDER, TEXT, MUTED, POS, NEG, fmtPrice } from './theme.js'
+import { Card, rowBg } from './ui.js'
 import { isMultiShard } from './shardState.js'
 
 type Entry = ApiUserMoneyHistoryResponse['list'][number]
@@ -81,38 +82,40 @@ export function MarketHistory() {
           </div>
         }
       >
-        <table style={{ width: '100%', 'border-collapse': 'collapse', 'font-size': '13px', opacity: loading() ? 0.6 : 1 }}>
-          <thead>
-            <tr style={{ color: MUTED, 'text-align': 'right' }}>
-              <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 6px' }}>Date</th>
-              <Show when={isMultiShard()}>
-                <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 6px' }}>Shard</th>
-              </Show>
-              <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Tick</th>
-              <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 12px 6px' }}>Description</th>
-              <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Change</th>
-              <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={entries()}>
-              {(e) => (
-                <tr style={{ 'border-top': `1px solid ${BORDER}`, 'text-align': 'right' }}>
-                  <td style={{ 'text-align': 'left', color: MUTED, padding: '6px 0' }}>{fmtDate(e.date)}</td>
-                  <Show when={isMultiShard()}>
-                    <td style={{ 'text-align': 'left', color: MUTED, padding: '6px 0' }}>{e.shard ?? '—'}</td>
-                  </Show>
-                  <td style={{ color: MUTED, padding: '6px 0' }}>{e.tick}</td>
-                  <td style={{ 'text-align': 'left', color: TEXT, padding: '6px 12px' }}>{describe(e)}</td>
-                  <td style={{ color: e.change > 0 ? POS : e.change < 0 ? NEG : MUTED, padding: '6px 0' }}>
-                    {e.change > 0 ? '+' : ''}{fmtPrice(e.change)}
-                  </td>
-                  <td style={{ color: TEXT, padding: '6px 0' }}>{fmtPrice(e.balance)}</td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
+        <Card title="Credit history">
+          <table style={{ width: '100%', 'border-collapse': 'collapse', 'font-size': '13px', opacity: loading() ? 0.6 : 1 }}>
+            <thead>
+              <tr style={{ color: MUTED, 'text-align': 'right' }}>
+                <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 7px 6px', 'border-bottom': `1px solid ${BORDER}` }}>Date</th>
+                <Show when={isMultiShard()}>
+                  <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Shard</th>
+                </Show>
+                <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Tick</th>
+                <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 12px 7px', 'border-bottom': `1px solid ${BORDER}` }}>Description</th>
+                <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Change</th>
+                <th style={{ 'font-weight': 400, padding: '0 6px 7px 0', 'border-bottom': `1px solid ${BORDER}` }}>Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={entries()}>
+                {(e, i) => (
+                  <tr style={{ background: rowBg(i()), 'text-align': 'right' }}>
+                    <td style={{ 'text-align': 'left', color: MUTED, padding: '7px 0 7px 6px' }}>{fmtDate(e.date)}</td>
+                    <Show when={isMultiShard()}>
+                      <td style={{ 'text-align': 'left', color: MUTED, padding: '7px 0' }}>{e.shard ?? '—'}</td>
+                    </Show>
+                    <td style={{ color: MUTED, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{e.tick}</td>
+                    <td style={{ 'text-align': 'left', color: TEXT, padding: '7px 12px' }}>{describe(e)}</td>
+                    <td style={{ color: e.change > 0 ? POS : e.change < 0 ? NEG : MUTED, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>
+                      {e.change > 0 ? '+' : ''}{fmtPrice(e.change)}
+                    </td>
+                    <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 6px 7px 0' }}>{fmtPrice(e.balance)}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </Card>
 
         <div style={{ display: 'flex', 'justify-content': 'space-between', 'margin-top': '16px' }}>
           <Show when={page() > 0} fallback={<span />}>

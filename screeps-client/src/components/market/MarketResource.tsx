@@ -6,7 +6,8 @@ import { goToMarket, goToRoom } from '~/stores/routeStore.js'
 import { parseRoomName } from '~/utils/roomName.js'
 import { resourceDisplayName } from '~/data/resources.js'
 import { ResourceSwatch } from './ResourceSwatch.js'
-import { PANEL, BORDER, TEXT, MUTED, ACCENT, fmtAmount, fmtPrice } from './theme.js'
+import { PANEL, BORDER, TEXT, MUTED, ACCENT, POS, NEG, fmtAmount, fmtPrice } from './theme.js'
+import { Card, rowBg } from './ui.js'
 
 type Row = ApiMarketOrder & { range?: number }
 type Sort = `${'+' | '-'}${string}`
@@ -135,8 +136,8 @@ export function MarketResource(props: { resourceType: string | null; shard: stri
         </Show>
 
         <div style={{ opacity: loading() ? 0.6 : 1 }}>
-          <OrderBook title="Selling" rows={sellRows()} defaultSort="+price" showRoom={!isToken()} shard={props.shard} />
-          <OrderBook title="Buying" rows={buyRows()} defaultSort="-price" showRoom={!isToken()} shard={props.shard} />
+          <OrderBook title="Selling" accent={POS} rows={sellRows()} defaultSort="+price" showRoom={!isToken()} shard={props.shard} />
+          <OrderBook title="Buying" accent={NEG} rows={buyRows()} defaultSort="-price" showRoom={!isToken()} shard={props.shard} />
           <PriceHistory stats={stats()} />
         </div>
       </Show>
@@ -144,17 +145,20 @@ export function MarketResource(props: { resourceType: string | null; shard: stri
   )
 }
 
-function OrderBook(props: { title: string; rows: Row[]; defaultSort: Sort; showRoom: boolean; shard: string | null }) {
+function OrderBook(props: { title: string; accent: string; rows: Row[]; defaultSort: Sort; showRoom: boolean; shard: string | null }) {
   const [sort, setSort] = createSignal<Sort>(props.defaultSort)
   const sorted = createMemo(() => sortRows(props.rows, sort()))
   const toggle = (key: string): void => { setSort((s) => (s === `+${key}` ? `-${key}` : `+${key}`)) }
 
   return (
-    <div style={{ 'margin-bottom': '28px' }}>
-      <div style={{ 'font-size': '13px', color: MUTED, 'text-transform': 'uppercase', 'margin-bottom': '8px' }}>{props.title}</div>
+    <Card
+      title={props.title}
+      accent={props.accent}
+      right={<span style={{ color: MUTED, 'font-size': '12px' }}>{props.rows.length} {props.rows.length === 1 ? 'order' : 'orders'}</span>}
+    >
       <Show
         when={props.rows.length}
-        fallback={<div style={{ color: MUTED, 'font-size': '13px', padding: '12px 0' }}>No orders</div>}
+        fallback={<div style={{ color: MUTED, 'font-size': '13px', padding: '10px 0' }}>No orders</div>}
       >
         <table style={{ width: '100%', 'border-collapse': 'collapse', 'font-size': '13px' }}>
           <thead>
@@ -171,14 +175,14 @@ function OrderBook(props: { title: string; rows: Row[]; defaultSort: Sort; showR
           </thead>
           <tbody>
             <For each={sorted()}>
-              {(o) => (
-                <tr style={{ 'border-top': `1px solid ${BORDER}`, 'text-align': 'right' }}>
-                  <td style={{ 'text-align': 'left', color: MUTED, 'font-family': 'monospace', padding: '6px 8px 6px 0' }}>{o._id}</td>
-                  <td style={{ color: TEXT, padding: '6px 0' }}>{fmtPrice(o.price)}</td>
-                  <td style={{ color: TEXT, padding: '6px 0' }}>{fmtAmount(o.amount)}</td>
-                  <td style={{ color: MUTED, padding: '6px 0' }}>{fmtAmount(o.remainingAmount)}</td>
+              {(o, i) => (
+                <tr style={{ background: rowBg(i()), 'text-align': 'right' }}>
+                  <td style={{ 'text-align': 'left', color: MUTED, 'font-family': 'monospace', padding: '7px 8px 7px 6px' }}>{o._id}</td>
+                  <td style={{ color: props.accent, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtPrice(o.price)}</td>
+                  <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(o.amount)}</td>
+                  <td style={{ color: MUTED, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(o.remainingAmount)}</td>
                   <Show when={props.showRoom}>
-                    <td style={{ padding: '6px 0' }}>
+                    <td style={{ padding: '7px 0' }}>
                       <Show when={o.roomName} fallback={<span style={{ color: MUTED }}>—</span>}>
                         <a
                           href="#"
@@ -189,7 +193,7 @@ function OrderBook(props: { title: string; rows: Row[]; defaultSort: Sort; showR
                         </a>
                       </Show>
                     </td>
-                    <td style={{ color: MUTED, padding: '6px 0' }}>{o.range ?? '—'}</td>
+                    <td style={{ color: MUTED, 'padding-right': '6px' }}>{o.range ?? '—'}</td>
                   </Show>
                 </tr>
               )}
@@ -197,16 +201,26 @@ function OrderBook(props: { title: string; rows: Row[]; defaultSort: Sort; showR
           </tbody>
         </table>
       </Show>
-    </div>
+    </Card>
   )
 }
 
 function Th(props: { label: string; col: string; sort: Sort; onClick: (col: string) => void; align?: 'left' | 'right' }): JSX.Element {
+  const active = () => props.sort === `+${props.col}` || props.sort === `-${props.col}`
   const caret = () => (props.sort === `+${props.col}` ? ' ▲' : props.sort === `-${props.col}` ? ' ▼' : '')
   return (
     <th
       onClick={() => props.onClick(props.col)}
-      style={{ 'text-align': props.align ?? 'right', 'font-weight': 400, cursor: 'pointer', padding: '0 0 6px', 'user-select': 'none', 'white-space': 'nowrap' }}
+      style={{
+        'text-align': props.align ?? 'right',
+        'font-weight': 400,
+        color: active() ? TEXT : MUTED,
+        cursor: 'pointer',
+        padding: props.align === 'left' ? '0 0 7px 6px' : '0 0 7px',
+        'border-bottom': `1px solid ${BORDER}`,
+        'user-select': 'none',
+        'white-space': 'nowrap',
+      }}
     >
       {props.label}{caret()}
     </th>
@@ -215,26 +229,25 @@ function Th(props: { label: string; col: string; sort: Sort; onClick: (col: stri
 
 function PriceHistory(props: { stats: ApiMarketStat[] }) {
   return (
-    <div>
-      <div style={{ 'font-size': '13px', color: MUTED, 'text-transform': 'uppercase', 'margin-bottom': '8px' }}>Price history</div>
-      <Show when={props.stats.length} fallback={<div style={{ color: MUTED, 'font-size': '13px' }}>No history</div>}>
+    <Card title="Price history">
+      <Show when={props.stats.length} fallback={<div style={{ color: MUTED, 'font-size': '13px', padding: '10px 0' }}>No history</div>}>
         <table style={{ width: '100%', 'border-collapse': 'collapse', 'font-size': '13px' }}>
           <thead>
             <tr style={{ color: MUTED, 'text-align': 'right' }}>
-              <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 6px' }}>Date</th>
-              <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Transactions</th>
-              <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Total volume</th>
-              <th style={{ 'font-weight': 400, padding: '0 0 6px' }}>Price (avg ± stddev)</th>
+              <th style={{ 'text-align': 'left', 'font-weight': 400, padding: '0 0 7px 6px', 'border-bottom': `1px solid ${BORDER}` }}>Date</th>
+              <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Transactions</th>
+              <th style={{ 'font-weight': 400, padding: '0 0 7px', 'border-bottom': `1px solid ${BORDER}` }}>Total volume</th>
+              <th style={{ 'font-weight': 400, padding: '0 6px 7px 0', 'border-bottom': `1px solid ${BORDER}` }}>Price (avg ± stddev)</th>
             </tr>
           </thead>
           <tbody>
             <For each={props.stats}>
-              {(s) => (
-                <tr style={{ 'border-top': `1px solid ${BORDER}`, 'text-align': 'right' }}>
-                  <td style={{ 'text-align': 'left', color: MUTED, padding: '6px 0' }}>{s.date}</td>
-                  <td style={{ color: TEXT, padding: '6px 0' }}>{fmtAmount(s.transactions)}</td>
-                  <td style={{ color: TEXT, padding: '6px 0' }}>{fmtAmount(s.volume)}</td>
-                  <td style={{ color: TEXT, padding: '6px 0' }}>
+              {(s, i) => (
+                <tr style={{ background: rowBg(i()), 'text-align': 'right' }}>
+                  <td style={{ 'text-align': 'left', color: MUTED, padding: '7px 0 7px 6px' }}>{s.date}</td>
+                  <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(s.transactions)}</td>
+                  <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 0' }}>{fmtAmount(s.volume)}</td>
+                  <td style={{ color: TEXT, 'font-variant-numeric': 'tabular-nums', padding: '7px 6px 7px 0' }}>
                     {fmtPrice(s.avgPrice)} <span style={{ color: MUTED }}>± {fmtPrice(s.stddevPrice)}</span>
                   </td>
                 </tr>
@@ -243,6 +256,6 @@ function PriceHistory(props: { stats: ApiMarketStat[] }) {
           </tbody>
         </table>
       </Show>
-    </div>
+    </Card>
   )
 }
