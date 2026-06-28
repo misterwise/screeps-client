@@ -1240,26 +1240,55 @@ function createObjectVisual(
       break
     }
     case 'spawn': {
-      g.circle(cx, cy, TILE_SIZE * 0.65)
+      // Layered by zIndex (sorted below; body `g` is added after the switch at 0):
+      // dark backdrop `g` (0) → owner badge (1) → energy core (2) → rim outline (3)
+      // → progress ring (4). The backdrop only shows through until the badge texture
+      // resolves, or stays for NPC/unowned spawns.
+      const R = TILE_SIZE * 0.65
+      g.circle(cx, cy, R)
       g.fill(ST_DARK)
-      g.circle(cx, cy, TILE_SIZE * 0.65)
-      g.stroke({ width: TILE_SIZE * 0.1, color: 0xcccccc })
-      // Energy core and progress ring both ride above the body `g` (whose dark disc
-      // is added after the switch) — sort children by zIndex so they do. Initial
-      // draws are best-effort; ObjectLayer.update() drives both per-tick.
       container.sortableChildren = true
       const cwt = container as ContainerWithTarget
+
+      // Owner's badge fills the body disc — the structure background (was flat black).
+      const spawnUserId = typeof obj.user === 'string' ? obj.user : undefined
+      const spawnBadge = spawnUserId ? users?.[spawnUserId]?.badge : undefined
+      if (spawnBadge && badgeCache) {
+        const bs = new Sprite()
+        bs.anchor.set(0.5, 0.5)
+        bs.width = R * 2
+        bs.height = R * 2
+        bs.position.set(cx, cy)
+        bs.zIndex = 1
+        const bsMask = new Graphics()
+        bsMask.circle(cx, cy, R)
+        bsMask.fill(0xffffff)
+        bs.mask = bsMask
+        container.addChild(bs)
+        container.addChild(bsMask)
+        cwt.__spawnBadgeSprite = bs
+        badgeCache.getOrCreate(spawnBadge as Badge).then((tex) => { if (!bs.destroyed) bs.texture = tex }).catch(() => {})
+      }
+
       // Inner yellow disc, scaled to reflect stored energy (percentage full).
       const { energy, capacity } = getExtensionEnergy(obj)
       const fill = new Graphics()
-      fill.zIndex = 1
+      fill.zIndex = 2
       container.addChild(fill)
       cwt.__fillGraphics = fill
       updateExtensionFill(cwt, calcSpawnFillRadius(energy, capacity))
       cwt.__spawnEnergy = energy
       cwt.__spawnCapacity = capacity
+
+      // Moat rim outline — above the badge so the edge stays crisp.
+      const rim = new Graphics()
+      rim.circle(cx, cy, R)
+      rim.stroke({ width: TILE_SIZE * 0.1, color: 0xcccccc })
+      rim.zIndex = 3
+      container.addChild(rim)
+
       const spawnRing = new Graphics()
-      spawnRing.zIndex = 1
+      spawnRing.zIndex = 4
       const t = spawnTiming(obj, 0)
       const ratio = t ? spawnRatio(t.needTime, t.endTime, 0) : null
       drawSpawnRing(spawnRing, ratio)
@@ -2357,6 +2386,7 @@ type ContainerWithTarget = Container & {
   __spawnSig?: string | null
   __spawnEnergy?: number
   __spawnCapacity?: number
+  __spawnBadgeSprite?: Sprite
   __fillGraphics?: Graphics
   __powerBankEllipseG?: Graphics
   __powerBankPower?: number
