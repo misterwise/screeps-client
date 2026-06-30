@@ -22,13 +22,15 @@ const MUTED = '#8b949e'
 const GOLD = '#d9b54a'
 const RED = '#C54444'
 
-// Stat interval in tick-buckets (matches the Overview cadence); the "Last 7 days"
-// window is the server's interpretation of this bucket count.
-const STAT_INTERVAL = 8
+// The official client's "Last 7 days" stat interval (its dropdown maps 8 → 1 hour,
+// 180 → 24 hours, 1440 → 7 days); the tiles sum this window.
+const STAT_INTERVAL = 1440
 
 function currentSeason(): string {
+  // Seasons roll over at UTC, so derive the YYYY-MM id in UTC — a non-UTC client
+  // near a month boundary would otherwise request the wrong (empty) season.
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
 // Servers return either a single season record at the top level or a one-element

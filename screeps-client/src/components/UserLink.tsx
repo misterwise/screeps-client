@@ -8,8 +8,9 @@ const NPC_USERNAMES = new Set(['Invader', 'Source Keeper'])
 
 // A clickable player username that opens the public profile page, mirroring the
 // vanilla client where every username links to `/profile/<name>`. Pass the
-// *resolved* username — when it is absent or an NPC, `fallback` renders inert so
-// raw ids and NPC names never become dead links.
+// *resolved* username: an NPC name renders as inert text, and when the username is
+// absent the `fallback` (e.g. a raw id or "—") renders instead — so raw ids and
+// NPC names never become dead links.
 export function UserLink(props: {
   username: string | null | undefined
   fallback?: JSX.Element
@@ -22,7 +23,7 @@ export function UserLink(props: {
 }) {
   const linkable = () => !!props.username && !NPC_USERNAMES.has(props.username)
   return (
-    <Show when={linkable()} fallback={<>{props.fallback ?? props.username}</>}>
+    <Show when={linkable()} fallback={<>{props.username ?? props.fallback}</>}>
       <span
         title="View user profile"
         onClick={(e) => {
